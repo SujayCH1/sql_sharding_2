@@ -29,7 +29,6 @@ const initialFormState: CreateProjectInput = {
   name: "",
   databaseType: "Postgres",
   connectionString: "",
-  shardCount: 4,
   description: "",
 }
 
@@ -51,7 +50,6 @@ export function CreateProjectDialog({ onCreate }: Props) {
       id: crypto.randomUUID(),
       name: form.name,
       databaseType: form.databaseType,
-      shardCount: form.shardCount,
       status: "ACTIVE",
       createdAt: new Date().toISOString(),
     }
@@ -105,16 +103,6 @@ export function CreateProjectDialog({ onCreate }: Props) {
               type="password"
               value={form.connectionString}
               onChange={e => update("connectionString", e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>Initial Shard Count</Label>
-            <Input
-              type="number"
-              min={1}
-              value={form.shardCount}
-              onChange={e => update("shardCount", Number(e.target.value))}
             />
           </div>
 
