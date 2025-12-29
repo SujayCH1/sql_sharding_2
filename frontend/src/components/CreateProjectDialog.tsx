@@ -11,52 +11,55 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
-import type { CreateProjectInput, Project } from "@/types/project"
+import { CreateProject } from "../../wailsjs/go/main/App"
 
-interface Props {
-  onCreate: (project: Project) => void
+type CreateProjectForm = {
+  name: string
+  description: string
 }
 
-const initialFormState: CreateProjectInput = {
+type Props = {
+  onProjectCreated: () => void | Promise<void>
+}
+
+const initialFormState: CreateProjectForm = {
   name: "",
-  databaseType: "Postgres",
-  connectionString: "",
   description: "",
 }
 
-
-export function CreateProjectDialog({ onCreate }: Props) {
+export function CreateProjectDialog({ onProjectCreated }: Props) {
   const [open, setOpen] = useState(false)
+  const [form, setForm] = useState<CreateProjectForm>(initialFormState)
+  const [loading, setLoading] = useState(false)
 
-  const [form, setForm] = useState<CreateProjectInput>(initialFormState)
-
-  function update<K extends keyof CreateProjectInput>(
+  function update<K extends keyof CreateProjectForm>(
     key: K,
-    value: CreateProjectInput[K]
+    value: CreateProjectForm[K]
   ) {
     setForm(prev => ({ ...prev, [key]: value }))
   }
 
-  function handleCreate() {
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      name: form.name,
-      databaseType: form.databaseType,
-      status: "ACTIVE",
-      createdAt: new Date().toISOString(),
-    }
+  async function handleCreate() {
+    if (!form.name.trim()) return
 
-    onCreate(newProject)
-    setForm(initialFormState)
-    setOpen(false) // close dialog
+    try {
+      setLoading(true)
+
+      // ✅ correct backend call
+      await CreateProject(form.name, form.description)
+
+      // ✅ refresh projects from DB
+      await onProjectCreated()
+
+      // ✅ reset & close
+      setForm(initialFormState)
+      setOpen(false)
+    } catch (err) {
+      console.error("Failed to create project", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -76,33 +79,7 @@ export function CreateProjectDialog({ onCreate }: Props) {
             <Input
               value={form.name}
               onChange={e => update("name", e.target.value)}
-            />
-          </div>
-
-          <div>
-            <Label>Database Type</Label>
-            <Select
-              value={form.databaseType}
-              onValueChange={v =>
-                update("databaseType", v as CreateProjectInput["databaseType"])
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Postgres">PostgreSQL</SelectItem>
-                <SelectItem value="MySQL">MySQL</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>Connection String</Label>
-            <Input
-              type="password"
-              value={form.connectionString}
-              onChange={e => update("connectionString", e.target.value)}
+              placeholder="My Sharded Database"
             />
           </div>
 
@@ -111,14 +88,25 @@ export function CreateProjectDialog({ onCreate }: Props) {
             <Textarea
               value={form.description}
               onChange={e => update("description", e.target.value)}
+              placeholder="Optional description"
             />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" onClick={() => setOpen(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setOpen(false)}
+              disabled={loading}
+            >
               Cancel
             </Button>
-            <Button onClick={handleCreate}>Create Project</Button>
+
+            <Button
+              onClick={handleCreate}
+              disabled={loading || !form.name.trim()}
+            >
+              {loading ? "Creating..." : "Create Project"}
+            </Button>
           </div>
         </div>
       </DialogContent>

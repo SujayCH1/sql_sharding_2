@@ -3,32 +3,41 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { MoreVertical } from "lucide-react"
 
-import type { Project } from "@/types/project"
+import type { repository } from "../../wailsjs/go/models"
 
+type Project = repository.Project
 
-export function ProjectCard({ project }: { project: Project }) {
+type Props = {
+  project: Project
+}
+
+export function ProjectCard({ project }: Props) {
+  const isActive = project.status === true
+
   return (
     <Card className="w-full max-w-sm">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          {project.name}
+          <span className="truncate">{project.name}</span>
+
           <Button variant="ghost" size="icon">
             <MoreVertical className="h-4 w-4" />
           </Button>
         </CardTitle>
       </CardHeader>
 
-      <CardContent className="space-y-2 text-sm">
-        <div>DB: {project.databaseType}</div>
-        <div>Shards: {project.shardCount}</div>
-
-        <Badge variant={
-          project.status === "ACTIVE" ? "default" :
-          project.status === "PAUSED" ? "secondary" : "destructive"
-        }>
-          {project.status}
+      <CardContent className="space-y-3 text-sm">
+        <Badge variant={isActive ? "default" : "secondary"}>
+          {isActive ? "ACTIVE" : "PAUSED"}
         </Badge>
+
+        {project.description && (
+          <p className="text-sm text-muted-foreground line-clamp-3">
+            {project.description}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
 }
+
