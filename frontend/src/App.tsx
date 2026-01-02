@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Home from "./pages/HomePage"
 import ProjectPage from "./pages/ProjectPage"
 import OverviewPage from "./pages/project/OverviewPage"
-import ShardsPage from "./pages/project/shards/ShardsPage"
-import ShardInfoPage from "./pages/project/ShardInfoPage"
+// import ShardsPage from "./pages/project/shards/ShardsPage"
+import ShardsPage from "./pages/project/ShardsPage"
+import ShardInfoPage from "./pages/project/shards/ShardInfoPage"
 
 function App() {
   return (

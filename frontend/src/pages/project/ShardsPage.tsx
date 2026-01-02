@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-import { ListShards, AddShard } from "../../../../wailsjs/go/main/App"
+import { ListShards, AddShard } from "../../../wailsjs/go/main/App"
 
 type Shard = {
   id: string

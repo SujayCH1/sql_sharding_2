@@ -61,6 +61,32 @@ export namespace repository {
 		    return a;
 		}
 	}
+	export class ShardConnection {
+	    shard_id: string;
+	    host: string;
+	    port: number;
+	    database_name: string;
+	    username: string;
+	    password: string;
+	    created_at: string;
+	    updated_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ShardConnection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.shard_id = source["shard_id"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.database_name = source["database_name"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.created_at = source["created_at"];
+	        this.updated_at = source["updated_at"];
+	    }
+	}
 
 }
 

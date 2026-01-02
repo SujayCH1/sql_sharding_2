@@ -31,7 +31,7 @@ func LoadAppilcationDatabase() error {
 		return err
 	}
 
-	config.AppicationDatabaseConnection.ConnInst = conn
+	config.ApplicationDatabaseConnection.ConnInst = conn
 
 	return nil
 }

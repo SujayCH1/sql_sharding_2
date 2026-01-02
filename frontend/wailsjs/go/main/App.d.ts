@@ -4,6 +4,8 @@ import {repository} from '../models';
 
 export function ActivateShard(arg1:string):Promise<void>;
 
+export function AddConnection(arg1:repository.ShardConnection):Promise<void>;
+
 export function AddShard(arg1:string):Promise<repository.Shard>;
 
 export function CreateProject(arg1:string,arg2:string):Promise<repository.Project>;
@@ -12,9 +14,13 @@ export function DeactivateShard(arg1:string):Promise<void>;
 
 export function DeleteAllShards(arg1:string):Promise<void>;
 
+export function DeleteConnection(arg1:string):Promise<void>;
+
 export function DeleteProject(arg1:string):Promise<void>;
 
 export function DeleteShard(arg1:string):Promise<string>;
+
+export function FetchConnectionInfo(arg1:string):Promise<repository.ShardConnection>;
 
 export function FetchProjectByID(arg1:string):Promise<repository.Project>;
 
@@ -23,3 +29,5 @@ export function FetchShardStatus(arg1:string):Promise<string>;
 export function ListProjects():Promise<Array<repository.Project>>;
 
 export function ListShards(arg1:string):Promise<Array<repository.Shard>>;
+
+export function UpdateConnection(arg1:repository.ShardConnection):Promise<void>;

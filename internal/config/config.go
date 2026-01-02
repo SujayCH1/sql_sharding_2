@@ -18,4 +18,4 @@ type AppicationDatabaseConn struct {
 	ConnInst *sql.DB
 }
 
-var AppicationDatabaseConnection AppicationDatabaseConn
+var ApplicationDatabaseConnection AppicationDatabaseConn

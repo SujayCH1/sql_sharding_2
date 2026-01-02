@@ -21,19 +21,24 @@ import {
   DeactivateShard,
   DeleteShard,
   FetchShardStatus,
-} from "../../../wailsjs/go/main/App"
+  FetchConnectionInfo,
+  AddConnection,
+  UpdateConnection,
+} from "../../../../wailsjs/go/main/App"
+
+import { repository } from "../../../../wailsjs/go/models"
 
 // ================= TYPES =================
 
 type AdminStatus = "active" | "inactive"
 
-type ConnectionInfo = {
+// UI-only form model (IMPORTANT)
+type ShardConnectionForm = {
   host: string
-  port: string
-  database: string
+  port: number
+  database_name: string
   username: string
-  ssl: boolean
-  updatedAt: string
+  password: string
 }
 
 export default function ShardInfoPage() {
@@ -45,8 +50,20 @@ export default function ShardInfoPage() {
   const [adminStatus, setAdminStatus] = useState<AdminStatus>("inactive")
   const [loadingStatus, setLoadingStatus] = useState(true)
 
-  const [connection, setConnection] = useState<ConnectionInfo | null>(null)
+  const [connection, setConnection] =
+    useState<repository.ShardConnection | null>(null)
+
   const [connDialogOpen, setConnDialogOpen] = useState(false)
+
+  const [form, setForm] = useState<ShardConnectionForm>({
+    host: "",
+    port: 5432,
+    database_name: "",
+    username: "",
+    password: "",
+  })
+
+  const isActive = adminStatus === "active"
 
   // ================= LOAD SHARD STATUS =================
 
@@ -65,7 +82,31 @@ export default function ShardInfoPage() {
     loadStatus()
   }, [shardId])
 
-  const isActive = adminStatus === "active"
+  // ================= LOAD CONNECTION =================
+
+  useEffect(() => {
+    if (!shardId) return
+
+    async function loadConnection() {
+      try {
+        const conn = await FetchConnectionInfo(shardId)
+        setConnection(conn)
+
+        // map DB model → form model
+        setForm({
+          host: conn.host,
+          port: conn.port,
+          database_name: conn.database_name,
+          username: conn.username,
+          password: "", // never prefill password
+        })
+      } catch {
+        setConnection(null)
+      }
+    }
+
+    loadConnection()
+  }, [shardId])
 
   // ================= ACTION HANDLERS =================
 
@@ -82,21 +123,43 @@ export default function ShardInfoPage() {
   }
 
   async function handleDeleteShard() {
-  if (!shardId) return
+    if (!shardId) return
 
-  const result = await DeleteShard(shardId)
+    const result = await DeleteShard(shardId)
 
-  if (result === "CANNOT_DELETE_ACTIVE_SHARD") {
-    alert("Deactivate the shard before deleting it.")
-    return
+    if (result === "CANNOT_DELETE_ACTIVE_SHARD") {
+      alert("Deactivate the shard before deleting it.")
+      return
+    }
+
+    if (result === "DELETED") {
+      navigate(-1)
+    }
   }
 
-  if (result === "DELETED") {
-    navigate(-1)
-    return
-  }
-}
+  async function handleSaveConnection() {
+    if (!shardId) return
 
+    const payload: repository.ShardConnection = {
+      shard_id: shardId,
+      host: form.host,
+      port: form.port,
+      database_name: form.database_name,
+      username: form.username,
+      password: form.password,
+      created_at: connection?.created_at ?? "",
+      updated_at: connection?.updated_at ?? "",
+    }
+
+    if (connection) {
+      await UpdateConnection(payload)
+    } else {
+      await AddConnection(payload)
+    }
+
+    setConnection(payload)
+    setConnDialogOpen(false)
+  }
 
   // ================= RENDER =================
 
@@ -106,13 +169,10 @@ export default function ShardInfoPage() {
         ← Back
       </Button>
 
-      {/* ================= MAIN ================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-        {/* ========== LEFT: INFO ========== */}
+        {/* LEFT */}
         <div className="space-y-4">
-
-          {/* Shard Overview */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Shard Overview</CardTitle>
@@ -123,23 +183,12 @@ export default function ShardInfoPage() {
                 <span>{shardId}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Admin Status</span>
-                <span className="capitalize">
-                  {loadingStatus ? "Loading..." : adminStatus}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Created</span>
-                <span>—</span>
-              </div>
-              <div className="pt-2 border-t mt-2 flex justify-between">
-                <span className="text-muted-foreground">Ping</span>
-                <span>Unknown</span>
+                <span className="text-muted-foreground">Status</span>
+                <span className="capitalize">{adminStatus}</span>
               </div>
             </CardContent>
           </Card>
 
-          {/* Connection Info */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Connection</CardTitle>
@@ -153,18 +202,11 @@ export default function ShardInfoPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Database</span>
-                    <span>{connection.database}</span>
+                    <span>{connection.database_name}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">User</span>
                     <span>{connection.username}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">SSL</span>
-                    <span>{connection.ssl ? "Yes" : "No"}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground pt-2">
-                    Updated {connection.updatedAt}
                   </div>
                 </>
               ) : (
@@ -176,20 +218,17 @@ export default function ShardInfoPage() {
           </Card>
         </div>
 
-        {/* ========== RIGHT: ACTIONS ========== */}
+        {/* RIGHT */}
         <div className="space-y-4">
-
-          {/* Actions */}
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-2">
 
-              {/* Activate / Deactivate */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button size="lg" disabled={loadingStatus}>
+                  <Button disabled={loadingStatus}>
                     {isActive ? "Deactivate Shard" : "Activate Shard"}
                   </Button>
                 </AlertDialogTrigger>
@@ -208,10 +247,9 @@ export default function ShardInfoPage() {
                 </AlertDialogContent>
               </AlertDialog>
 
-              {/* Delete */}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
+                  <Button variant="destructive">
                     Delete Shard
                   </Button>
                 </AlertDialogTrigger>
@@ -234,13 +272,13 @@ export default function ShardInfoPage() {
             </CardContent>
           </Card>
 
-          {/* Connection Settings */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-base">Connection Settings</CardTitle>
               <Button
                 size="sm"
                 variant="outline"
+                disabled={isActive}
                 onClick={() => setConnDialogOpen(true)}
               >
                 {connection ? "Change" : "Add"}
@@ -250,64 +288,70 @@ export default function ShardInfoPage() {
         </div>
       </div>
 
-      {/* ================= FUTURE ================= */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Shard Data & Analytics</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Coming soon
-        </CardContent>
-      </Card>
-
-      {/* ================= CONNECTION DIALOG ================= */}
+      {/* CONNECTION DIALOG */}
       <AlertDialog open={connDialogOpen} onOpenChange={setConnDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {connection ? "Change Connection" : "Add Connection"}
+              {connection ? "Update Connection" : "Add Connection"}
             </AlertDialogTitle>
           </AlertDialogHeader>
 
           <div className="space-y-3">
             <div>
               <Label>Host</Label>
-              <Input placeholder="localhost" />
+              <Input
+                value={form.host}
+                onChange={(e) =>
+                  setForm({ ...form, host: e.target.value })
+                }
+              />
             </div>
+
             <div>
               <Label>Port</Label>
-              <Input placeholder="5432" />
+              <Input
+                value={form.port}
+                onChange={(e) =>
+                  setForm({ ...form, port: Number(e.target.value) })
+                }
+              />
             </div>
+
             <div>
               <Label>Database</Label>
-              <Input placeholder="app_db" />
+              <Input
+                value={form.database_name}
+                onChange={(e) =>
+                  setForm({ ...form, database_name: e.target.value })
+                }
+              />
             </div>
+
             <div>
               <Label>Username</Label>
-              <Input placeholder="app_user" />
+              <Input
+                value={form.username}
+                onChange={(e) =>
+                  setForm({ ...form, username: e.target.value })
+                }
+              />
             </div>
+
             <div>
               <Label>Password</Label>
-              <Input type="password" />
+              <Input
+                type="password"
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
+              />
             </div>
           </div>
 
           <div className="flex justify-end gap-2 mt-4">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                // TEMP — backend persistence later
-                setConnection({
-                  host: "localhost",
-                  port: "5432",
-                  database: "app_db",
-                  username: "app_user",
-                  ssl: false,
-                  updatedAt: new Date().toLocaleString(),
-                })
-                setConnDialogOpen(false)
-              }}
-            >
+            <AlertDialogAction onClick={handleSaveConnection}>
               Save
             </AlertDialogAction>
           </div>
