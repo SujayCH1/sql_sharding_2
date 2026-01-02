@@ -1,0 +1,9 @@
+ALTER TABLE projects
+ALTER COLUMN status DROP DEFAULT;
+
+ALTER TABLE projects
+ALTER COLUMN status TYPE BOOLEAN
+USING (status = 'ACTIVE');
+
+ALTER TABLE projects
+ALTER COLUMN status SET DEFAULT false;

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
 
 import { ProjectCard } from "@/components/ProjectCard"
 import { CreateProjectDialog } from "@/components/CreateProjectDialog"
@@ -12,7 +13,8 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Load projects from backend (DB)
+  const navigate = useNavigate()
+
   async function loadProjects() {
     try {
       const data = await ListProjects()
@@ -24,7 +26,6 @@ export default function Home() {
     }
   }
 
-  // Load projects when Home mounts
   useEffect(() => {
     loadProjects()
   }, [])
@@ -33,8 +34,6 @@ export default function Home() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold">Projects</h1>
-
-        {/* Dialog no longer passes a project object */}
         <CreateProjectDialog onProjectCreated={loadProjects} />
       </div>
 
@@ -49,7 +48,13 @@ export default function Home() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects.map(project => (
-            <ProjectCard key={project.id} project={project} />
+            <div
+              key={project.id}
+              onClick={() => navigate(`/projects/${project.id}`)}
+              className="cursor-pointer transition hover:bg-muted rounded-md"
+            >
+              <ProjectCard project={project} />
+            </div>
           ))}
         </div>
       )}

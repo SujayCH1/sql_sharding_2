@@ -23,7 +23,7 @@ type ProjectRepository struct {
 	db *sql.DB
 }
 
-// takes a db connection and assigns it to 'database' and return the 'database'
+// return an instance of 'database' binded with connection infomation received in args
 func NewProjectRepository(db *sql.DB) *ProjectRepository {
 	return &ProjectRepository{db: db}
 }
@@ -134,4 +134,35 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 
 	return nil
 
+}
+
+// reterive asingle project
+func (r *ProjectRepository) GetProjectByID(ctx context.Context, id string) (Project, error) {
+	projectID, err := uuid.Parse(id)
+	if err != nil {
+		return Project{}, err
+	}
+
+	query := `
+		SELECT id, name, description, shard_count, status, created_at
+		FROM projects
+		WHERE id = $1
+	`
+
+	var p Project
+
+	err = r.db.QueryRowContext(ctx, query, projectID).Scan(
+		&p.ID,
+		&p.Name,
+		&p.Description,
+		&p.ShardCount,
+		&p.Status,
+		&p.CreatedAt,
+	)
+
+	if err != nil {
+		return Project{}, err
+	}
+
+	return p, nil
 }
