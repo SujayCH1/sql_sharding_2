@@ -8,7 +8,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
-func LoadAppilcationDatabase() error {
+func LoadAppilcationDatabase() (*sql.DB, error) {
 
 	connStr := fmt.Sprintf(
 		"postgres://%s:%s@%s:%s/%s?sslmode=disable",
@@ -20,18 +20,14 @@ func LoadAppilcationDatabase() error {
 	)
 
 	conn, err := sql.Open("postgres", connStr)
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = conn.Ping()
-
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	config.ApplicationDatabaseConnection.ConnInst = conn
-
-	return nil
+	return conn, err
 }

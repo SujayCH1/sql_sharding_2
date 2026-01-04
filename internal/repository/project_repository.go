@@ -236,3 +236,24 @@ func (r *ProjectRepository) GetProjectByID(ctx context.Context, id string) (Proj
 
 	return p, nil
 }
+
+func (r *ProjectRepository) FetchActiveProject(ctx context.Context) (string, error) {
+
+	query := `
+		SELECT id FROM projects WHERE status = 'active'
+	`
+
+	row := r.db.QueryRowContext(
+		ctx,
+		query,
+	)
+
+	var id string
+
+	err := row.Scan(&id)
+	if err != nil {
+		return "", err
+	}
+
+	return id, nil
+}

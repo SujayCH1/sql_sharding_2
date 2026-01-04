@@ -1,6 +1,8 @@
 package config
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 // store the connection credentials of the app db
 type ApplicationDatabaseCreds struct {

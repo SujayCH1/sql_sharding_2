@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"sql-sharding-v2/internal/config"
+	"sql-sharding-v2/internal/connections"
 	"sql-sharding-v2/internal/loader"
 	"sql-sharding-v2/internal/repository"
 	"sql-sharding-v2/pkg/logger"
@@ -12,6 +12,15 @@ import (
 // App struct
 type App struct {
 	ctx context.Context
+
+	// repository
+	ProjectRepo         *repository.ProjectRepository
+	ShardRepo           *repository.ShardRepository
+	ShardConnectionRepo *repository.ShardConnectionRepository
+
+	// conn layer
+	ShardConnectionStore   *connections.ConnectionStore
+	ShardConnectionManager *connections.ConnectionManager
 }
 
 // NewApp creates a new App application struct
@@ -23,16 +32,59 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	loader.LoadServices(ctx)
+
+	err := loader.LoadServices(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := loader.LoadAppilcationDatabase()
+	if err != nil {
+		panic(err)
+	}
+
+	a.ProjectRepo = repository.NewProjectRepository(db)
+	a.ShardRepo = repository.NewShardRepository(db)
+	a.ShardConnectionRepo = repository.NewShardConnectionRepository(db)
+
+	a.ShardConnectionStore = connections.NewConnectionStore()
+
+	a.ShardConnectionManager = connections.NewConnectionManager(
+		a.ShardConnectionStore,
+		a.ProjectRepo,
+		a.ShardRepo,
+		a.ShardConnectionRepo,
+	)
+
+	err = a.ShardConnectionManager.InitiateActiveConnections(ctx)
+	if err != nil {
+		logger.Logger.Error("Failed to initiate connection for active project", "error", err)
+		// panic(err)
+	}
+
+	logger.Logger.Info("Application startup successful!")
+
 }
+
+// var ProjectRepo repository.ProjectRepository = *repository.NewProjectRepository(config.ApplicationDatabaseConnection.ConnInst)
+
+// var ShardRepo repository.ShardRepository = *repository.NewShardRepository(config.ApplicationDatabaseConnection.ConnInst)
+
+// var ShardConnectionRepo repository.ShardConnectionRepository = *repository.NewShardConnectionRepository(config.ApplicationDatabaseConnection.ConnInst)
+
+// var ShardConnectionStore connections.ConnectionStore = *connections.NewConnectionStore()
+
+// var ShardConnectionManager connections.ConnectionManager = *connections.NewConnectionManager(
+// 	&ShardConnectionStore,
+// 	&ProjectRepo,
+// 	&ShardRepo,
+// 	&ShardConnectionRepo,
+// )
 
 // project repository - Call to add a new project
 func (a *App) CreateProject(name string, description string) (*repository.Project, error) {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	result, err := repo.ProjectAdd(a.ctx, name, description)
+	result, err := a.ProjectRepo.ProjectAdd(a.ctx, name, description)
 
 	if err != nil {
 		logger.Logger.Error("Error while creating project", "error", err)
@@ -46,11 +98,8 @@ func (a *App) CreateProject(name string, description string) (*repository.Projec
 
 // project repository - Call to list existing project
 func (a *App) ListProjects() ([]repository.Project, error) {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	result, err := repo.ProjectList(a.ctx)
+	result, err := a.ProjectRepo.ProjectList(a.ctx)
 
 	if err != nil {
 		logger.Logger.Error("Error while fetching projects", "error", err)
@@ -64,11 +113,8 @@ func (a *App) ListProjects() ([]repository.Project, error) {
 
 // project repository - Call to delete a project
 func (a *App) DeleteProject(id string) error {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ProjectRemove(a.ctx, id)
+	err := a.ProjectRepo.ProjectRemove(a.ctx, id)
 	if err != nil {
 		logger.Logger.Error("Error while deleting project: ", "error", err)
 		return err
@@ -81,11 +127,8 @@ func (a *App) DeleteProject(id string) error {
 
 // project repository - Call to fetch project by ID
 func (a *App) FetchProjectByID(id string) (repository.Project, error) {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	result, err := repo.GetProjectByID(a.ctx, id)
+	result, err := a.ProjectRepo.GetProjectByID(a.ctx, id)
 	if err != nil {
 		logger.Logger.Error("Error while fetching project", "error", err)
 		return repository.Project{}, err
@@ -98,11 +141,8 @@ func (a *App) FetchProjectByID(id string) (repository.Project, error) {
 
 // shard repository - Call to add a shard
 func (a *App) AddShard(projectID string) (*repository.Shard, error) {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	result, err := repo.ShardAdd(a.ctx, projectID)
+	result, err := a.ShardRepo.ShardAdd(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to add shard", "error", err)
 		return nil, err
@@ -115,28 +155,22 @@ func (a *App) AddShard(projectID string) (*repository.Shard, error) {
 
 // shard repository - Call to get list of all shards
 func (a *App) ListShards(projectID string) ([]repository.Shard, error) {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	result, err := repo.ShardList(a.ctx, projectID)
+	result, err := a.ShardRepo.ShardList(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to list shards", "error", err)
 		return nil, err
 	}
 
-	logger.Logger.Info("Successfully fected all shards")
+	logger.Logger.Info("Successfully fetched all shards")
 
 	return result, nil
 }
 
 // shard repository - Call to deactivate a shard
 func (a *App) DeactivateShard(shardID string) error {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ShardDeactivate(a.ctx, shardID)
+	err := a.ShardRepo.ShardDeactivate(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to deactivate shard", "error", err)
 		return err
@@ -149,11 +183,8 @@ func (a *App) DeactivateShard(shardID string) error {
 
 // shard repository - Call to delete all shards of a project
 func (a *App) DeleteAllShards(projectID string) error {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ShardDeleteAll(a.ctx, projectID)
+	err := a.ShardRepo.ShardDeleteAll(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to delete shards for project", "error", err)
 		return err
@@ -166,10 +197,6 @@ func (a *App) DeleteAllShards(projectID string) error {
 
 // shard repository - Call to delete a single shard
 func (a *App) DeleteShard(shardID string) (string, error) {
-
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
 	isInactive, err := a.checkIfShardInactive(shardID)
 	if err != nil {
@@ -186,7 +213,7 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 		return "", err
 	}
 
-	err = repo.ShardDelete(a.ctx, shardID)
+	err = a.ShardRepo.ShardDelete(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to delete shard", "error", err)
 		return "", err
@@ -198,11 +225,8 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 
 // shard repository - Call to activate a shard
 func (a *App) ActivateShard(shardID string) error {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ShardActivate(a.ctx, shardID)
+	err := a.ShardRepo.ShardActivate(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to activate shard", "error", err)
 		return err
@@ -215,11 +239,8 @@ func (a *App) ActivateShard(shardID string) error {
 
 // shard repository - Call to fetch status of a shard
 func (a *App) FetchShardStatus(shardID string) (string, error) {
-	repo := repository.NewShardRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	status, err := repo.FetchShardStatus(a.ctx, shardID)
+	status, err := a.ShardRepo.FetchShardStatus(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to fetch shard shard", "error", err)
 		return "", err
@@ -232,11 +253,8 @@ func (a *App) FetchShardStatus(shardID string) (string, error) {
 
 // shard connection repository - add connection detail for one shard
 func (a *App) AddConnection(connectionInfo *repository.ShardConnection) error {
-	repo := repository.NewShardConnectionRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ConnectionCreate(a.ctx, connectionInfo)
+	err := a.ShardConnectionRepo.ConnectionCreate(a.ctx, connectionInfo)
 	if err != nil {
 		logger.Logger.Error("Failed to add shard connection details", "error", err)
 		return err
@@ -249,11 +267,8 @@ func (a *App) AddConnection(connectionInfo *repository.ShardConnection) error {
 
 // shard connection repo - remove connection detail of a shard
 func (a *App) DeleteConnection(shardID string) error {
-	repo := repository.NewShardConnectionRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ConnectionRemove(a.ctx, shardID)
+	err := a.ShardConnectionRepo.ConnectionRemove(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to remove shard connection details", "error", err)
 	}
@@ -265,11 +280,8 @@ func (a *App) DeleteConnection(shardID string) error {
 
 // shard connection repo - fetch connection details of a shard using shard id
 func (a *App) FetchConnectionInfo(shardID string) (repository.ShardConnection, error) {
-	repo := repository.NewShardConnectionRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	conn, err := repo.FetchConnectionByShardID(a.ctx, shardID)
+	conn, err := a.ShardConnectionRepo.FetchConnectionByShardID(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to fecth sahrd connection infomation", "error", err)
 		return repository.ShardConnection{}, err
@@ -282,11 +294,8 @@ func (a *App) FetchConnectionInfo(shardID string) (repository.ShardConnection, e
 
 // shard connection repo - update existing connection details
 func (a *App) UpdateConnection(connInfo repository.ShardConnection) error {
-	repo := repository.NewShardConnectionRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ConnectionUpdate(a.ctx, connInfo)
+	err := a.ShardConnectionRepo.ConnectionUpdate(a.ctx, connInfo)
 	if err != nil {
 		logger.Logger.Error("Failed to update shard connection details", "error", err)
 		return err
@@ -299,9 +308,6 @@ func (a *App) UpdateConnection(connInfo repository.ShardConnection) error {
 
 // project repository - set status of project to active
 func (a *App) Activateproject(projectID string) error {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
 	otherProjectsInactive, err := a.checkAllProjectsInactive()
 	if err != nil {
@@ -325,11 +331,15 @@ func (a *App) Activateproject(projectID string) error {
 		return errors.New("All shards are not active")
 	}
 
-	err = repo.ProjectActivate(a.ctx, projectID)
+	err = a.ProjectRepo.ProjectActivate(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to activate project", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Initiating shard connection for active projects")
+
+	err = a.ShardConnectionManager.InitiateActiveConnections(a.ctx)
 
 	logger.Logger.Info("Successfully activated the project", "project_id", projectID)
 
@@ -338,11 +348,8 @@ func (a *App) Activateproject(projectID string) error {
 
 // project repository - set status of project to inactive
 func (a *App) Deactivateproject(projectID string) error {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	err := repo.ProjectDeactivate(a.ctx, projectID)
+	err := a.ProjectRepo.ProjectDeactivate(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to deactivate project", "error", err)
 	}
@@ -354,11 +361,8 @@ func (a *App) Deactivateproject(projectID string) error {
 
 // project repository - fetch status of a project
 func (a *App) FetchProjectStatus(projectID string) (string, error) {
-	repo := repository.NewProjectRepository(
-		config.ApplicationDatabaseConnection.ConnInst,
-	)
 
-	status, err := repo.FetchProjectStatus(a.ctx, projectID)
+	status, err := a.ProjectRepo.FetchProjectStatus(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to fetch project status", "error", err)
 		return "", err
