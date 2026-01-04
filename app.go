@@ -35,9 +35,11 @@ func (a *App) CreateProject(name string, description string) (*repository.Projec
 	result, err := repo.ProjectAdd(a.ctx, name, description)
 
 	if err != nil {
-		logger.Logger.Error("Error while creating Project: %w", err)
+		logger.Logger.Error("Error while creating project", "error", err)
 		return nil, err
 	}
+
+	logger.Logger.Info("Successfully created project", "project_name", name)
 
 	return result, nil
 }
@@ -51,9 +53,11 @@ func (a *App) ListProjects() ([]repository.Project, error) {
 	result, err := repo.ProjectList(a.ctx)
 
 	if err != nil {
-		logger.Logger.Error("Error while fetching Projects: %w", err)
+		logger.Logger.Error("Error while fetching projects", "error", err)
 		return nil, err
 	}
+
+	logger.Logger.Info("Sucessfully fetched all projects")
 
 	return result, nil
 }
@@ -66,9 +70,11 @@ func (a *App) DeleteProject(id string) error {
 
 	err := repo.ProjectRemove(a.ctx, id)
 	if err != nil {
-		logger.Logger.Error("Error while deleting project: ", err)
+		logger.Logger.Error("Error while deleting project: ", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully deleted project", "project_id", id)
 
 	return nil
 }
@@ -79,13 +85,15 @@ func (a *App) FetchProjectByID(id string) (repository.Project, error) {
 		config.ApplicationDatabaseConnection.ConnInst,
 	)
 
-	resullt, err := repo.GetProjectByID(a.ctx, id)
+	result, err := repo.GetProjectByID(a.ctx, id)
 	if err != nil {
-		logger.Logger.Error("Error while fetching project: ", err)
+		logger.Logger.Error("Error while fetching project", "error", err)
 		return repository.Project{}, err
 	}
 
-	return resullt, err
+	logger.Logger.Info("Successfully fetched project", "project_name", result.Name, "project_id", result.ID)
+
+	return result, err
 }
 
 // shard repository - Call to add a shard
@@ -96,9 +104,11 @@ func (a *App) AddShard(projectID string) (*repository.Shard, error) {
 
 	result, err := repo.ShardAdd(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to add shard: ", err)
+		logger.Logger.Error("Failed to add shard", "error", err)
 		return nil, err
 	}
+
+	logger.Logger.Info("Successfully created shard", "shard_id", result.ID)
 
 	return result, nil
 }
@@ -111,9 +121,11 @@ func (a *App) ListShards(projectID string) ([]repository.Shard, error) {
 
 	result, err := repo.ShardList(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to list shards: ", err)
+		logger.Logger.Error("Failed to list shards", "error", err)
 		return nil, err
 	}
+
+	logger.Logger.Info("Successfully fected all shards")
 
 	return result, nil
 }
@@ -126,9 +138,11 @@ func (a *App) DeactivateShard(shardID string) error {
 
 	err := repo.ShardDeactivate(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to deactivate shard: ", err)
+		logger.Logger.Error("Failed to deactivate shard", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully deactivated shard", "shard_id", shardID)
 
 	return nil
 }
@@ -141,9 +155,11 @@ func (a *App) DeleteAllShards(projectID string) error {
 
 	err := repo.ShardDeleteAll(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete shards for project: ", err)
+		logger.Logger.Error("Failed to delete shards for project", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully deleted all shards")
 
 	return nil
 }
@@ -156,12 +172,13 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 
 	err := a.DeleteConnection(shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete shard: ", err)
+		logger.Logger.Error("Failed to delete shard", "error", err)
 		return "", err
 	}
 
 	err = repo.ShardDelete(a.ctx, shardID)
 	if err == nil {
+		logger.Logger.Info("Successfully deleted shard", "shard_id", shardID)
 		return "DELETED", nil
 	}
 
@@ -169,7 +186,7 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 		return "CANNOT_DELETE_ACTIVE_SHARD", nil
 	}
 
-	logger.Logger.Error("Failed to delete shard: ", err)
+	logger.Logger.Error("Failed to delete shard", "error", err)
 	return "", err
 }
 
@@ -181,9 +198,11 @@ func (a *App) ActivateShard(shardID string) error {
 
 	err := repo.ShardActivate(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to activate shard: ", err)
+		logger.Logger.Error("Failed to activate shard", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully activated shard", "shard_id", shardID)
 
 	return nil
 }
@@ -196,9 +215,11 @@ func (a *App) FetchShardStatus(shardID string) (string, error) {
 
 	status, err := repo.FetchShardStatus(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch shard shard: ", err)
+		logger.Logger.Error("Failed to fetch shard shard", "error", err)
 		return "", err
 	}
+
+	logger.Logger.Info("Successfully fetched shard status", "shard_id", shardID)
 
 	return status, nil
 }
@@ -211,9 +232,11 @@ func (a *App) AddConnection(connectionInfo *repository.ShardConnection) error {
 
 	err := repo.ConnectionCreate(a.ctx, connectionInfo)
 	if err != nil {
-		logger.Logger.Error("Failed to add shard connection details: ", err)
+		logger.Logger.Error("Failed to add shard connection details", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully added shard connection details", "shard_id", connectionInfo.ShardID)
 
 	return nil
 }
@@ -226,8 +249,10 @@ func (a *App) DeleteConnection(shardID string) error {
 
 	err := repo.ConnectionRemove(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to remove shard connection details: ", err)
+		logger.Logger.Error("Failed to remove shard connection details", "error", err)
 	}
+
+	logger.Logger.Info("Successfully deleted shard connection details", "shard_id", shardID)
 
 	return nil
 }
@@ -240,9 +265,11 @@ func (a *App) FetchConnectionInfo(shardID string) (repository.ShardConnection, e
 
 	conn, err := repo.FetchConnectionByShardID(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to fecth sahrd connection infomation: ", err)
+		logger.Logger.Error("Failed to fecth sahrd connection infomation", "error", err)
 		return repository.ShardConnection{}, err
 	}
+
+	logger.Logger.Info("Successfully fetched shard connection details", "shard_id", shardID)
 
 	return conn, nil
 }
@@ -255,9 +282,11 @@ func (a *App) UpdateConnection(connInfo repository.ShardConnection) error {
 
 	err := repo.ConnectionUpdate(a.ctx, connInfo)
 	if err != nil {
-		logger.Logger.Error("Failed to update shard connection details: ", err)
+		logger.Logger.Error("Failed to update shard connection details", "error", err)
 		return err
 	}
+
+	logger.Logger.Info("Successfully updated shard connection details", "shard_id", connInfo.ShardID)
 
 	return nil
 }
