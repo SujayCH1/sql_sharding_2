@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -7,6 +8,8 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
@@ -33,7 +36,7 @@ type Props = {
   form: ShardConnectionForm
   setForm: React.Dispatch<React.SetStateAction<ShardConnectionForm>>
   toggleShardStatus: () => void
-  handleDeleteShard: () => void
+  handleDeleteShard: () => Promise<string>
   handleSaveConnection: () => void
 }
 
@@ -51,6 +54,30 @@ export function ShardInfoView({
   handleDeleteShard,
   handleSaveConnection,
 }: Props) {
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  async function onDeleteShard() {
+    try {
+      const result = await handleDeleteShard()
+
+      if (result === "CANNOT_DELETE_ACTIVE_SHARD") {
+        setDeleteError("Deactivate the shard before deleting it.")
+        return
+      }
+
+      if (result === "DELETED") {
+        history.back()
+        return
+      }
+
+      setDeleteError("Unable to delete shard.")
+    } catch {
+      setDeleteError("Unable to delete shard.")
+    }
+  }
+
+
+
   return (
     <div className="p-6 space-y-6 max-w-6xl">
       <Button variant="ghost" onClick={() => history.back()}>
@@ -145,10 +172,11 @@ export function ShardInfoView({
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       className="bg-destructive"
-                      onClick={handleDeleteShard}
+                      onClick={onDeleteShard}
                     >
                       Delete
                     </AlertDialogAction>
+
                   </div>
                 </AlertDialogContent>
               </AlertDialog>
@@ -238,6 +266,23 @@ export function ShardInfoView({
               Save
             </AlertDialogAction>
           </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* DELETE ERROR DIALOG */}
+      <AlertDialog open={!!deleteError} onOpenChange={() => setDeleteError(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Action blocked</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteError}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setDeleteError(null)}>
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

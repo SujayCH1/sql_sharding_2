@@ -22,7 +22,7 @@ type ShardConnectionForm = {
 
 export function useShardInfo(
   shardId: string,
-  navigate: (delta: number) => void
+  // navigate: (delta: number) => void
 ) {
   const [adminStatus, setAdminStatus] = useState<AdminStatus>("inactive")
   const [loadingStatus, setLoadingStatus] = useState(true)
@@ -87,18 +87,33 @@ export function useShardInfo(
     }
   }
 
-  async function handleDeleteShard() {
-    const result = await DeleteShard(shardId)
+  // const [deleteError, setDeleteError] = useState<string | null>(null)
 
-    if (result === "CANNOT_DELETE_ACTIVE_SHARD") {
-      alert("Deactivate the shard before deleting it.")
-      return
-    }
+  // async function handleDeleteShard() {
+  //   try {
+  //     const result = await DeleteShard(shardId)
 
-    if (result === "DELETED") {
-      navigate(-1)
-    }
+  //     if (result == "CANNOT_DELETE_ACTIVE_SHARD") {
+  //       setDeleteError("Deactivate the shard before deleting it.")
+  //       return
+  //     }
+
+  //     if (result === "DELETED") {
+  //       navigate(-1)
+  //       return
+  //     }
+
+  //     setDeleteError("Unable to delete shard.")
+  //   } catch {
+  //     setDeleteError("Unable to delete shard.")
+  //   }
+
+  // }
+
+  async function handleDeleteShard(): Promise<string> {
+    return await DeleteShard(shardId)
   }
+
 
   async function handleSaveConnection() {
     const payload: repository.ShardConnection = {

@@ -29,6 +29,7 @@ export default function OverviewPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const [project, setProject] = useState<Project | null>(null)
   const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!projectId) return
@@ -45,6 +46,8 @@ export default function OverviewPage() {
     if (!projectId) return
 
     setLoading(true)
+    setErrorMessage(null)
+
     try {
       if (isActive) {
         await Deactivateproject(projectId)
@@ -54,6 +57,22 @@ export default function OverviewPage() {
 
       const updated = await FetchProjectByID(projectId)
       setProject(updated)
+
+    } catch (err: unknown) {
+      const message = err?.toString?.() || ""
+
+      if (message.includes("another project is already active")) {
+        setErrorMessage(
+          "Another project is already active. Please deactivate it first."
+        )
+      } else if (message.includes("All shards are not active")) {
+        setErrorMessage(
+          "All shards must be active before this project can be activated."
+        )
+      } else {
+        setErrorMessage("Operation failed. Please try again.")
+        console.error("Project activation error:", err)
+      }
     } finally {
       setLoading(false)
     }
@@ -61,6 +80,12 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-4">
+      {errorMessage && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+          {errorMessage}
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <Badge variant={isActive ? "default" : "secondary"}>
           {isActive ? "active" : "inactive"}

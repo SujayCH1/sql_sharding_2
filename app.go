@@ -166,28 +166,34 @@ func (a *App) DeleteAllShards(projectID string) error {
 
 // shard repository - Call to delete a single shard
 func (a *App) DeleteShard(shardID string) (string, error) {
+
 	repo := repository.NewShardRepository(
 		config.ApplicationDatabaseConnection.ConnInst,
 	)
 
-	err := a.DeleteConnection(shardID)
+	isInactive, err := a.checkIfShardInactive(shardID)
+	if err != nil {
+		return "", err
+	}
+
+	if !isInactive {
+		return "CANNOT_DELETE_ACTIVE_SHARD", nil
+	}
+
+	err = a.DeleteConnection(shardID)
+	if err != nil {
+		logger.Logger.Error("Failed to delete shard connection", "error", err)
+		return "", err
+	}
+
+	err = repo.ShardDelete(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to delete shard", "error", err)
 		return "", err
 	}
 
-	err = repo.ShardDelete(a.ctx, shardID)
-	if err == nil {
-		logger.Logger.Info("Successfully deleted shard", "shard_id", shardID)
-		return "DELETED", nil
-	}
-
-	if errors.Is(err, repository.ErrShardDeleteBlocked) {
-		return "CANNOT_DELETE_ACTIVE_SHARD", nil
-	}
-
-	logger.Logger.Error("Failed to delete shard", "error", err)
-	return "", err
+	logger.Logger.Info("Successfully deleted shard", "shard_id", shardID)
+	return "DELETED", nil
 }
 
 // shard repository - Call to activate a shard
@@ -207,7 +213,7 @@ func (a *App) ActivateShard(shardID string) error {
 	return nil
 }
 
-// shard repository - Call to fetch a shard of status
+// shard repository - Call to fetch status of a shard
 func (a *App) FetchShardStatus(shardID string) (string, error) {
 	repo := repository.NewShardRepository(
 		config.ApplicationDatabaseConnection.ConnInst,
@@ -297,7 +303,29 @@ func (a *App) Activateproject(projectID string) error {
 		config.ApplicationDatabaseConnection.ConnInst,
 	)
 
-	err := repo.ProjectActivate(a.ctx, projectID)
+	otherProjectsInactive, err := a.checkAllProjectsInactive()
+	if err != nil {
+		logger.Logger.Error("Failed to check status of projects for projct activation", "error", err)
+		return err
+	}
+
+	if otherProjectsInactive == false {
+		logger.Logger.Error("Failed to activate project", "error", "another project is already active")
+		return errors.New("another project is already active")
+	}
+
+	allShardsNotActive, err := a.checkAllShardsActive(projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to check status of projects for projct activation", "error", err)
+		return err
+	}
+
+	if allShardsNotActive == false {
+		logger.Logger.Error("Failed to activate project", "error", "All shards are not active")
+		return errors.New("All shards are not active")
+	}
+
+	err = repo.ProjectActivate(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("Failed to activate project", "error", err)
 		return err
