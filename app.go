@@ -290,3 +290,53 @@ func (a *App) UpdateConnection(connInfo repository.ShardConnection) error {
 
 	return nil
 }
+
+// project repository - set status of project to active
+func (a *App) Activateproject(projectID string) error {
+	repo := repository.NewProjectRepository(
+		config.ApplicationDatabaseConnection.ConnInst,
+	)
+
+	err := repo.ProjectActivate(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to activate project", "error", err)
+		return err
+	}
+
+	logger.Logger.Info("Successfully activated the project", "project_id", projectID)
+
+	return nil
+}
+
+// project repository - set status of project to inactive
+func (a *App) Deactivateproject(projectID string) error {
+	repo := repository.NewProjectRepository(
+		config.ApplicationDatabaseConnection.ConnInst,
+	)
+
+	err := repo.ProjectDeactivate(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to deactivate project", "error", err)
+	}
+
+	logger.Logger.Info("Successfully deactivated the project", "project_id", projectID)
+
+	return nil
+}
+
+// project repository - fetch status of a project
+func (a *App) FetchProjectStatus(projectID string) (string, error) {
+	repo := repository.NewProjectRepository(
+		config.ApplicationDatabaseConnection.ConnInst,
+	)
+
+	status, err := repo.FetchProjectStatus(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch project status", "error", err)
+		return "", err
+	}
+
+	logger.Logger.Info("Succesfully fetched status of project", "project_id", projectID)
+	return status, nil
+
+}

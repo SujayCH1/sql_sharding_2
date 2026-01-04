@@ -14,7 +14,7 @@ type Project struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	ShardCount  int    `json:"shard_count"`
-	Status      bool   `json:"status"`
+	Status      string `json:"status"`
 	CreatedAt   string `json:"created_at"`
 }
 
@@ -41,7 +41,7 @@ func (r *ProjectRepository) ProjectAdd(ctx context.Context, name string,
 		Name:        name,
 		Description: descriptrion,
 		ShardCount:  0,
-		Status:      false,
+		Status:      "inactive",
 		CreatedAt:   time.Now().String(),
 	}
 
@@ -136,7 +136,77 @@ func (r *ProjectRepository) ProjectRemove(ctx context.Context, id string) error 
 
 }
 
-// reterive asingle project
+// activate a project
+func (r *ProjectRepository) ProjectActivate(ctx context.Context, projectID string) error {
+
+	query := `
+		UPDATE projects
+		SET status = 'active'
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		projectID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+// deactivate a project
+func (r *ProjectRepository) ProjectDeactivate(ctx context.Context, projectID string) error {
+
+	query := `
+		UPDATE projects
+		SET status = 'inactive'
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(
+		ctx,
+		query,
+		projectID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+// fetches status of a project using project id
+func (r *ProjectRepository) FetchProjectStatus(ctx context.Context, projectID string) (string, error) {
+
+	query := `
+		SELECT status FROM projects WHERE id = $1
+	`
+
+	row := r.db.QueryRowContext(
+		ctx,
+		query,
+		projectID,
+	)
+
+	var status string
+
+	err := row.Scan(&status)
+	if err != nil {
+		return "", err
+	}
+
+	return status, nil
+
+}
+
+// retrive a single project
 func (r *ProjectRepository) GetProjectByID(ctx context.Context, id string) (Project, error) {
 	projectID, err := uuid.Parse(id)
 	if err != nil {

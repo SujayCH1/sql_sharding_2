@@ -5,7 +5,7 @@ export namespace repository {
 	    name: string;
 	    description: string;
 	    shard_count: number;
-	    status: boolean;
+	    status: string;
 	    created_at: string;
 	
 	    static createFrom(source: any = {}) {

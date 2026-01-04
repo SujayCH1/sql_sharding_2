@@ -12,7 +12,7 @@ type Props = {
 }
 
 export function ProjectCard({ project }: Props) {
-  const isActive = project.status === true
+  const isActive = project.status === "active"
 
   return (
     <Card className="w-full max-w-sm">
@@ -28,7 +28,7 @@ export function ProjectCard({ project }: Props) {
 
       <CardContent className="space-y-3 text-sm">
         <Badge variant={isActive ? "default" : "secondary"}>
-          {isActive ? "ACTIVE" : "PAUSED"}
+          {isActive ? "active" : "inactive"}
         </Badge>
 
         {project.description && (

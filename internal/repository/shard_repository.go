@@ -9,20 +9,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// status enum
-type Status string
-
-const (
-	StatusActive   Status = "active"
-	StatusInactive Status = "inactive"
-)
-
 // represents the shard table in database
 type Shard struct {
 	ID         string    `json:"id"`
 	ProjectID  string    `json:"project_id"`
 	ShardIndex int       `json:"shard_index"`
-	Status     Status    `json:"status"`
+	Status     string    `json:"status"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
@@ -52,7 +44,7 @@ func (s *ShardRepository) ShardAdd(ctx context.Context, projectID string) (*Shar
 	shard.ID = uuid.New().String()
 	shard.ProjectID = projectID
 	shard.ShardIndex = newIndex
-	shard.Status = StatusInactive
+	shard.Status = "inactive"
 
 	query := `
 		INSERT INTO shards (id, project_id, shard_index, status)

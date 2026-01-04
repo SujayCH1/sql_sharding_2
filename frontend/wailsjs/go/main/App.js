@@ -6,6 +6,10 @@ export function ActivateShard(arg1) {
   return window['go']['main']['App']['ActivateShard'](arg1);
 }
 
+export function Activateproject(arg1) {
+  return window['go']['main']['App']['Activateproject'](arg1);
+}
+
 export function AddConnection(arg1) {
   return window['go']['main']['App']['AddConnection'](arg1);
 }
@@ -20,6 +24,10 @@ export function CreateProject(arg1, arg2) {
 
 export function DeactivateShard(arg1) {
   return window['go']['main']['App']['DeactivateShard'](arg1);
+}
+
+export function Deactivateproject(arg1) {
+  return window['go']['main']['App']['Deactivateproject'](arg1);
 }
 
 export function DeleteAllShards(arg1) {
@@ -44,6 +52,10 @@ export function FetchConnectionInfo(arg1) {
 
 export function FetchProjectByID(arg1) {
   return window['go']['main']['App']['FetchProjectByID'](arg1);
+}
+
+export function FetchProjectStatus(arg1) {
+  return window['go']['main']['App']['FetchProjectStatus'](arg1);
 }
 
 export function FetchShardStatus(arg1) {
