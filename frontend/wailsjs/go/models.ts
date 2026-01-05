@@ -28,10 +28,10 @@ export namespace repository {
 	    version: number;
 	    state: string;
 	    ddl_sql: string;
-	    error_message: string;
+	    error_message?: string;
 	    "created _at": string;
-	    commited_at: string;
-	    applied_at: string;
+	    commited_at?: string;
+	    applied_at?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ProjectSchema(source);

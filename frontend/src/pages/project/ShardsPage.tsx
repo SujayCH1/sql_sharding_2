@@ -43,13 +43,6 @@ export default function ShardsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <div className="flex justify-between items-center">
-        <Button variant="ghost" onClick={() => navigate(-1)}>
-          ← Back
-        </Button>
-
-        <Button onClick={handleAddShard}>+ Add Shard</Button>
-      </div>
 
       <Table>
         <TableHeader>

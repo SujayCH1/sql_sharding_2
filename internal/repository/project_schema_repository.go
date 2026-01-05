@@ -10,15 +10,15 @@ import (
 
 // represents project_schema table
 type ProjectSchema struct {
-	ID          string `json:"id"`
-	ProjectID   string `json:"project_id"`
-	Version     int    `json:"version"`
-	State       string `json:"state"`
-	DDL_SQL     string `json:"ddl_sql"`
-	ErrMsg      string `json:"error_message"`
-	CreatedAt   string `json:"created _at"`
-	CommittedAt string `json:"commited_at"`
-	AppliedAt   string `json:"applied_at"`
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"project_id"`
+	Version     int     `json:"version"`
+	State       string  `json:"state"`
+	DDL_SQL     string  `json:"ddl_sql"`
+	ErrMsg      *string `json:"error_message"`
+	CreatedAt   string  `json:"created _at"`
+	CommittedAt *string `json:"commited_at"`
+	AppliedAt   *string `json:"applied_at"`
 }
 
 // project_schema as a db

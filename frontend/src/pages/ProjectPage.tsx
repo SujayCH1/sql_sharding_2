@@ -19,9 +19,10 @@ function SideNav({ projectId }: { projectId: string }) {
   const base = `/projects/${projectId}`
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-3 py-2 text-sm rounded-md transition ${isActive
-      ? "bg-muted font-medium"
-      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+    `px-3 py-2 text-sm rounded-md transition ${
+      isActive
+        ? "bg-muted font-medium"
+        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
     }`
 
   return (
@@ -33,9 +34,14 @@ function SideNav({ projectId }: { projectId: string }) {
       <NavLink to={`${base}/shards`} className={linkClass}>
         Shards
       </NavLink>
+
+      <NavLink to={`${base}/schema`} className={linkClass}>
+        Schema
+      </NavLink>
     </nav>
   )
 }
+
 
 export default function ProjectPage() {
   const navigate = useNavigate()
