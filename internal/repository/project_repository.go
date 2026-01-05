@@ -29,8 +29,7 @@ func NewProjectRepository(db *sql.DB) *ProjectRepository {
 }
 
 // execute query to add a poject row
-func (r *ProjectRepository) ProjectAdd(ctx context.Context, name string,
-	descriptrion string) (*Project, error) {
+func (r *ProjectRepository) ProjectAdd(ctx context.Context, name string, descriptrion string) (*Project, error) {
 
 	newID := uuid.New()
 

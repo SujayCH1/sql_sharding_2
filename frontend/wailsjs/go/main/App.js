@@ -18,8 +18,16 @@ export function AddShard(arg1) {
   return window['go']['main']['App']['AddShard'](arg1);
 }
 
+export function CommitSchemaDraft(arg1, arg2) {
+  return window['go']['main']['App']['CommitSchemaDraft'](arg1, arg2);
+}
+
 export function CreateProject(arg1, arg2) {
   return window['go']['main']['App']['CreateProject'](arg1, arg2);
+}
+
+export function CreateSchemaDraft(arg1, arg2) {
+  return window['go']['main']['App']['CreateSchemaDraft'](arg1, arg2);
 }
 
 export function DeactivateShard(arg1) {
@@ -42,6 +50,10 @@ export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
 }
 
+export function DeleteSchemaDraft(arg1) {
+  return window['go']['main']['App']['DeleteSchemaDraft'](arg1);
+}
+
 export function DeleteShard(arg1) {
   return window['go']['main']['App']['DeleteShard'](arg1);
 }
@@ -60,6 +72,26 @@ export function FetchProjectStatus(arg1) {
 
 export function FetchShardStatus(arg1) {
   return window['go']['main']['App']['FetchShardStatus'](arg1);
+}
+
+export function GetCurrentSchema(arg1) {
+  return window['go']['main']['App']['GetCurrentSchema'](arg1);
+}
+
+export function GetFailedShardExecutions(arg1) {
+  return window['go']['main']['App']['GetFailedShardExecutions'](arg1);
+}
+
+export function GetProjectSchemaStatus(arg1) {
+  return window['go']['main']['App']['GetProjectSchemaStatus'](arg1);
+}
+
+export function GetSchemaExecutionStatus(arg1) {
+  return window['go']['main']['App']['GetSchemaExecutionStatus'](arg1);
+}
+
+export function GetSchemaHistory(arg1) {
+  return window['go']['main']['App']['GetSchemaHistory'](arg1);
 }
 
 export function ListProjects() {

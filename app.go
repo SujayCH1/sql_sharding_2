@@ -14,9 +14,11 @@ type App struct {
 	ctx context.Context
 
 	// repository
-	ProjectRepo         *repository.ProjectRepository
-	ShardRepo           *repository.ShardRepository
-	ShardConnectionRepo *repository.ShardConnectionRepository
+	ProjectRepo               *repository.ProjectRepository
+	ShardRepo                 *repository.ShardRepository
+	ShardConnectionRepo       *repository.ShardConnectionRepository
+	ProjectSchemaRepo         *repository.ProjectSchemaRepository
+	SchemaExecutionStatusRepo *repository.SchemaExecutionStatusRepository
 
 	// conn layer
 	ShardConnectionStore   *connections.ConnectionStore
@@ -43,12 +45,17 @@ func (a *App) startup(ctx context.Context) {
 		panic(err)
 	}
 
+	// repos
 	a.ProjectRepo = repository.NewProjectRepository(db)
 	a.ShardRepo = repository.NewShardRepository(db)
 	a.ShardConnectionRepo = repository.NewShardConnectionRepository(db)
+	a.ProjectSchemaRepo = repository.NewProjectSchema(db)
+	a.SchemaExecutionStatusRepo = repository.NewSchemaExecutionStatus(db)
 
+	// stores
 	a.ShardConnectionStore = connections.NewConnectionStore()
 
+	// managers
 	a.ShardConnectionManager = connections.NewConnectionManager(
 		a.ShardConnectionStore,
 		a.ProjectRepo,
@@ -371,4 +378,157 @@ func (a *App) FetchProjectStatus(projectID string) (string, error) {
 	logger.Logger.Info("Succesfully fetched status of project", "project_id", projectID)
 	return status, nil
 
+}
+
+// project schema repository - create new schema draft
+func (a *App) CreateSchemaDraft(projectID string, ddlSQL string) (*repository.ProjectSchema, error) {
+
+	schema, err := a.ProjectSchemaRepo.ProjectSchemaCreateDraft(a.ctx, projectID, ddlSQL)
+	if err != nil {
+		logger.Logger.Error("Failed to create schema draft", "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("Succesfully created schema draft of project", "project_id", projectID)
+	return schema, nil
+
+}
+
+// project schema repository - commit existing schema draft
+func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
+
+	ok, err := a.checkIfProjectInactive(projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch project status", "error", err)
+		return err
+	}
+	if !ok {
+		return errors.New("project must be inactive to modify schema")
+	}
+
+	ok, err = a.checkIfSchemaDraft(schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch schema state", "error", err)
+		return err
+	}
+	if !ok {
+		return errors.New("schema must be in draft state to commit")
+	}
+
+	inFlight, err := a.checkIfSchemaInFlight(projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to check schema in-flight status", "error", err)
+		return err
+	}
+	if inFlight {
+		return errors.New("another schema change is already in progress")
+	}
+
+	schema, err := a.ProjectSchemaRepo.ProjectSchemaFetchBySchemaID(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch schema by id", "error", err)
+		return err
+	}
+
+	if !a.checkIfOnlyDDL(schema.DDL_SQL) {
+		return errors.New("only DDL statements are allowed in schema changes")
+	}
+
+	destructive, err := a.checkIfDDLDestructive(projectID, schema.DDL_SQL)
+	if err != nil {
+		logger.Logger.Error("Failed to validate destructive DDL", "error", err)
+		return err
+	}
+	if destructive {
+		return errors.New("destructive DDL is not allowed after initial schema")
+	}
+
+	err = a.ProjectSchemaRepo.ProjectSchemaCommitDraft(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to commit project schema", "error", err)
+		return err
+	}
+
+	logger.Logger.Info("Successfully committed project schema", "schema_id", schemaID)
+	return nil
+}
+
+// project schema repository - get latest schema of project
+func (a *App) GetCurrentSchema(projectID string) (*repository.ProjectSchema, error) {
+
+	schema, err := a.ProjectSchemaRepo.ProjectSchemaGetLatest(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch latest schema of project", "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("Successfully fetched latest schema of project")
+	return schema, nil
+
+}
+
+// project schema repository - get history of a schema
+func (a *App) GetSchemaHistory(projectID string) ([]repository.ProjectSchema, error) {
+
+	history, err := a.ProjectSchemaRepo.ProjectSchemaFetchHistory(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch project schema history", "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("Successfully fetched project schema history")
+	return history, nil
+
+}
+
+// project schema repository - delete a draft of schema
+func (a *App) DeleteSchemaDraft(schemaID string) error {
+
+	err := a.ProjectSchemaRepo.ProjectSchemaDeleteDraft(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to delete project schema draft", "error", err)
+		return err
+	}
+
+	logger.Logger.Info("Successfully deleted project schema draft")
+	return nil
+
+}
+
+// schema execution status repo -get execution status of all shards
+func (a *App) GetSchemaExecutionStatus(schemaID string) ([]repository.SchemaExecutionStatus, error) {
+
+	statuAll, err := a.SchemaExecutionStatusRepo.ExecutionRecordsFetchStatusAll(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch execution status of all records of schema", "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("Successfully fetched exxecution status of all records of schema")
+	return statuAll, err
+}
+
+// schema execution status repo - get record of failed shard executions
+func (a *App) GetFailedShardExecutions(schemaID string) ([]repository.SchemaExecutionStatus, error) {
+
+	statuAll, err := a.SchemaExecutionStatusRepo.ExecutionRecordsFetchStatusFailed(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch execution status of all failed records of schema", "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("Successfully fetched execution status of all failed records of schema")
+	return statuAll, err
+}
+
+// project schema repository - get status of a projectschema
+func (a *App) GetProjectSchemaStatus(schemaID string) (string, error) {
+	status, err := a.ProjectSchemaRepo.ProjectSchemaGetState(a.ctx, schemaID)
+	if err != nil {
+		logger.Logger.Error("Fialed to fetch status of a schema", "error", err)
+		return "", err
+	}
+
+	logger.Logger.Info("Successfully fetched status of schema")
+	return status, nil
 }

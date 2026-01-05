@@ -22,6 +22,56 @@ export namespace repository {
 	        this.created_at = source["created_at"];
 	    }
 	}
+	export class ProjectSchema {
+	    id: string;
+	    project_id: string;
+	    version: number;
+	    state: string;
+	    ddl_sql: string;
+	    error_message: string;
+	    "created _at": string;
+	    commited_at: string;
+	    applied_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectSchema(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.project_id = source["project_id"];
+	        this.version = source["version"];
+	        this.state = source["state"];
+	        this.ddl_sql = source["ddl_sql"];
+	        this.error_message = source["error_message"];
+	        this["created _at"] = source["created _at"];
+	        this.commited_at = source["commited_at"];
+	        this.applied_at = source["applied_at"];
+	    }
+	}
+	export class SchemaExecutionStatus {
+	    id: string;
+	    schema_id: string;
+	    shard_id: string;
+	    state: string;
+	    error_message?: string;
+	    executed_at?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SchemaExecutionStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.schema_id = source["schema_id"];
+	        this.shard_id = source["shard_id"];
+	        this.state = source["state"];
+	        this.error_message = source["error_message"];
+	        this.executed_at = source["executed_at"];
+	    }
+	}
 	export class Shard {
 	    id: string;
 	    project_id: string;

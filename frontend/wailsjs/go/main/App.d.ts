@@ -10,7 +10,11 @@ export function AddConnection(arg1:repository.ShardConnection):Promise<void>;
 
 export function AddShard(arg1:string):Promise<repository.Shard>;
 
+export function CommitSchemaDraft(arg1:string,arg2:string):Promise<void>;
+
 export function CreateProject(arg1:string,arg2:string):Promise<repository.Project>;
+
+export function CreateSchemaDraft(arg1:string,arg2:string):Promise<repository.ProjectSchema>;
 
 export function DeactivateShard(arg1:string):Promise<void>;
 
@@ -22,6 +26,8 @@ export function DeleteConnection(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
 
+export function DeleteSchemaDraft(arg1:string):Promise<void>;
+
 export function DeleteShard(arg1:string):Promise<string>;
 
 export function FetchConnectionInfo(arg1:string):Promise<repository.ShardConnection>;
@@ -31,6 +37,16 @@ export function FetchProjectByID(arg1:string):Promise<repository.Project>;
 export function FetchProjectStatus(arg1:string):Promise<string>;
 
 export function FetchShardStatus(arg1:string):Promise<string>;
+
+export function GetCurrentSchema(arg1:string):Promise<repository.ProjectSchema>;
+
+export function GetFailedShardExecutions(arg1:string):Promise<Array<repository.SchemaExecutionStatus>>;
+
+export function GetProjectSchemaStatus(arg1:string):Promise<string>;
+
+export function GetSchemaExecutionStatus(arg1:string):Promise<Array<repository.SchemaExecutionStatus>>;
+
+export function GetSchemaHistory(arg1:string):Promise<Array<repository.ProjectSchema>>;
 
 export function ListProjects():Promise<Array<repository.Project>>;
 
