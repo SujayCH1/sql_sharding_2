@@ -27,7 +27,7 @@ type ProjectSchemaRepository struct {
 }
 
 // constructor for ProjectSchema
-func NewProjectSchema(projSchm *sql.DB) *ProjectSchemaRepository {
+func NewProjectSchemaRepository(projSchm *sql.DB) *ProjectSchemaRepository {
 	return &ProjectSchemaRepository{
 		projSchm: projSchm,
 	}
@@ -319,7 +319,7 @@ func (p *ProjectSchemaRepository) ProjectSchemaDeleteDraft(ctx context.Context, 
 	return nil
 }
 
-// func to fecth latest applied schema
+// func to fetch latest applied schema
 func (p *ProjectSchemaRepository) ProjectSchemaGetApplied(ctx context.Context, projectID string) (*ProjectSchema, error) {
 
 	query := `
@@ -358,6 +358,55 @@ func (p *ProjectSchemaRepository) ProjectSchemaGetApplied(ctx context.Context, p
 
 	return &schema, nil
 
+}
+
+// func to fetch pending schema
+func (p *ProjectSchemaRepository) ProjectSchemaGetPending(
+	ctx context.Context,
+	projectID string,
+) (*ProjectSchema, error) {
+
+	query := `
+		SELECT 
+			id, project_id, version, state, ddl_sql,
+			error_message, created_at, committed_at, applied_at
+		FROM project_schemas
+		WHERE project_id = $1 AND state = 'pending'
+		ORDER BY version ASC
+		LIMIT 1
+	`
+
+	row := p.projSchm.QueryRowContext(ctx, query, projectID)
+
+	var schema ProjectSchema
+	if err := row.Scan(
+		&schema.ID,
+		&schema.ProjectID,
+		&schema.Version,
+		&schema.State,
+		&schema.DDL_SQL,
+		&schema.ErrMsg,
+		&schema.CreatedAt,
+		&schema.CommittedAt,
+		&schema.AppliedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	return &schema, nil
+}
+
+// func to modify pending -> applying
+func (p *ProjectSchemaRepository) ProjectSchemaSetApplying(ctx context.Context, schemaID string) error {
+
+	query := `
+		UPDATE project_schemas
+		SET state = 'applying'
+		WHERE id = $1
+	`
+
+	_, err := p.projSchm.ExecContext(ctx, query, schemaID)
+	return err
 }
 
 // helper to decide correct version fo schema

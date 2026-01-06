@@ -30,6 +30,8 @@ export function DeleteSchemaDraft(arg1:string):Promise<void>;
 
 export function DeleteShard(arg1:string):Promise<string>;
 
+export function ExecuteProjectSchema(arg1:string):Promise<void>;
+
 export function FetchConnectionInfo(arg1:string):Promise<repository.ShardConnection>;
 
 export function FetchProjectByID(arg1:string):Promise<repository.Project>;
@@ -51,5 +53,7 @@ export function GetSchemaHistory(arg1:string):Promise<Array<repository.ProjectSc
 export function ListProjects():Promise<Array<repository.Project>>;
 
 export function ListShards(arg1:string):Promise<Array<repository.Shard>>;
+
+export function RetrySchemaExecution(arg1:string):Promise<void>;
 
 export function UpdateConnection(arg1:repository.ShardConnection):Promise<void>;

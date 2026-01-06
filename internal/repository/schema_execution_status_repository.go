@@ -9,19 +9,19 @@ import (
 )
 
 type SchemaExecutionStatus struct {
-	ID         string  `json:"id"`
-	SchemaID   string  `json:"schema_id"`
-	ShardID    string  `json:"shard_id"`
-	State      string  `json:"state"`
-	ErrMsg     *string `json:"error_message"`
-	ExecutedAt *string `json:"executed_at"`
+	ID         string `json:"id"`
+	SchemaID   string `json:"schema_id"`
+	ShardID    string `json:"shard_id"`
+	State      string `json:"state"`
+	ErrMsg     string `json:"error_message"`
+	ExecutedAt string `json:"executed_at"`
 }
 
 type SchemaExecutionStatusRepository struct {
 	schmExeSt *sql.DB
 }
 
-func NewSchemaExecutionStatus(schmExeSt *sql.DB) *SchemaExecutionStatusRepository {
+func NewSchemaExecutionStatusRepository(schmExeSt *sql.DB) *SchemaExecutionStatusRepository {
 	return &SchemaExecutionStatusRepository{
 		schmExeSt: schmExeSt,
 	}
@@ -30,29 +30,27 @@ func NewSchemaExecutionStatus(schmExeSt *sql.DB) *SchemaExecutionStatusRepositor
 // func to add record of a execution
 func (r *SchemaExecutionStatusRepository) ExecutionRecordsCreateRecord(
 	ctx context.Context,
-	schemaID string,
-	shardIDs []string,
+	record SchemaExecutionStatus,
 ) error {
 
 	query := `
 		INSERT INTO schema_execution_status
 		(id, schema_id, shard_id, state, error_message, executed_at)
 		VALUES
-		($1, $2, $3, $4, NULL, NULL)
+		($1, $2, $3, $4, $5, NOW())
 	`
 
-	for _, shardID := range shardIDs {
-		_, err := r.schmExeSt.ExecContext(
-			ctx,
-			query,
-			uuid.New().String(),
-			schemaID,
-			shardID,
-			"pending",
-		)
-		if err != nil {
-			return err
-		}
+	_, err := r.schmExeSt.ExecContext(
+		ctx,
+		query,
+		uuid.New().String(),
+		record.SchemaID,
+		record.ShardID,
+		record.State,
+		record.ErrMsg,
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil

@@ -58,6 +58,10 @@ export function DeleteShard(arg1) {
   return window['go']['main']['App']['DeleteShard'](arg1);
 }
 
+export function ExecuteProjectSchema(arg1) {
+  return window['go']['main']['App']['ExecuteProjectSchema'](arg1);
+}
+
 export function FetchConnectionInfo(arg1) {
   return window['go']['main']['App']['FetchConnectionInfo'](arg1);
 }
@@ -100,6 +104,10 @@ export function ListProjects() {
 
 export function ListShards(arg1) {
   return window['go']['main']['App']['ListShards'](arg1);
+}
+
+export function RetrySchemaExecution(arg1) {
+  return window['go']['main']['App']['RetrySchemaExecution'](arg1);
 }
 
 export function UpdateConnection(arg1) {

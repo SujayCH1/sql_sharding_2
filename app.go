@@ -6,6 +6,7 @@ import (
 	"sql-sharding-v2/internal/connections"
 	"sql-sharding-v2/internal/loader"
 	"sql-sharding-v2/internal/repository"
+	"sql-sharding-v2/internal/schema"
 	"sql-sharding-v2/pkg/logger"
 )
 
@@ -49,8 +50,8 @@ func (a *App) startup(ctx context.Context) {
 	a.ProjectRepo = repository.NewProjectRepository(db)
 	a.ShardRepo = repository.NewShardRepository(db)
 	a.ShardConnectionRepo = repository.NewShardConnectionRepository(db)
-	a.ProjectSchemaRepo = repository.NewProjectSchema(db)
-	a.SchemaExecutionStatusRepo = repository.NewSchemaExecutionStatus(db)
+	a.ProjectSchemaRepo = repository.NewProjectSchemaRepository(db)
+	a.SchemaExecutionStatusRepo = repository.NewSchemaExecutionStatusRepository(db)
 
 	// stores
 	a.ShardConnectionStore = connections.NewConnectionStore()
@@ -531,4 +532,61 @@ func (a *App) GetProjectSchemaStatus(schemaID string) (string, error) {
 
 	logger.Logger.Info("Successfully fetched status of schema")
 	return status, nil
+}
+
+// DDL executor - execute pending schema
+func (a *App) ExecuteProjectSchema(projectID string) error {
+
+	status, err := a.ProjectRepo.FetchProjectStatus(a.ctx, projectID)
+	if err != nil {
+		return err
+	}
+
+	if status == "inactive" {
+		return errors.New("Active project first")
+	}
+
+	err = schema.ExecuteProjectSchema(
+		a.ctx,
+		projectID,
+		a.ProjectSchemaRepo,
+		a.ShardRepo,
+		a.SchemaExecutionStatusRepo,
+		func(shardID string, ddl string) error {
+			return a.execDDLonShard(projectID, shardID, ddl)
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DDL executor - retry mechanism
+func (a *App) RetrySchemaExecution(projectID string) error {
+
+	return schema.RetryFailedSchema(
+		a.ctx,
+		projectID,
+		a.ProjectSchemaRepo,
+		a.SchemaExecutionStatusRepo,
+	)
+}
+
+// helper to pass repos to DDL executor
+func (a *App) execDDLonShard(
+	projectID string,
+	shardID string,
+	ddl string,
+) error {
+
+	db, err := a.ShardConnectionStore.Get(projectID, shardID)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.ExecContext(a.ctx, ddl)
+	return err
 }

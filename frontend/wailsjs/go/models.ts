@@ -55,8 +55,8 @@ export namespace repository {
 	    schema_id: string;
 	    shard_id: string;
 	    state: string;
-	    error_message?: string;
-	    executed_at?: string;
+	    error_message: string;
+	    executed_at: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SchemaExecutionStatus(source);

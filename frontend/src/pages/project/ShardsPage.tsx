@@ -44,6 +44,10 @@ export default function ShardsPage() {
   return (
     <div className="p-6 space-y-4">
 
+      <div className="flex justify-between items-center">
+        <Button onClick={handleAddShard}>+ Add Shard</Button>
+      </div>
+
       <Table>
         <TableHeader>
           <TableRow>
