@@ -20,10 +20,15 @@ type App struct {
 	ShardConnectionRepo       *repository.ShardConnectionRepository
 	ProjectSchemaRepo         *repository.ProjectSchemaRepository
 	SchemaExecutionStatusRepo *repository.SchemaExecutionStatusRepository
+	ColumnsRepo               *repository.ColumnRepository
+	FKEdgesRepo               *repository.FKEdgesRepository
 
 	// conn layer
 	ShardConnectionStore   *connections.ConnectionStore
 	ShardConnectionManager *connections.ConnectionManager
+
+	//services
+	SchemaService *schema.SchemaService
 }
 
 // NewApp creates a new App application struct
@@ -52,6 +57,8 @@ func (a *App) startup(ctx context.Context) {
 	a.ShardConnectionRepo = repository.NewShardConnectionRepository(db)
 	a.ProjectSchemaRepo = repository.NewProjectSchemaRepository(db)
 	a.SchemaExecutionStatusRepo = repository.NewSchemaExecutionStatusRepository(db)
+	a.ColumnsRepo = repository.NewColumnsRepository(db)
+	a.FKEdgesRepo = repository.NewFKEdgesRepository(db)
 
 	// stores
 	a.ShardConnectionStore = connections.NewConnectionStore()
@@ -62,6 +69,12 @@ func (a *App) startup(ctx context.Context) {
 		a.ProjectRepo,
 		a.ShardRepo,
 		a.ShardConnectionRepo,
+	)
+
+	// services
+	a.SchemaService = schema.NewSchemaService(
+		a.ColumnsRepo,
+		a.FKEdgesRepo,
 	)
 
 	err = a.ShardConnectionManager.InitiateActiveConnections(ctx)
@@ -425,17 +438,17 @@ func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
 		return errors.New("another schema change is already in progress")
 	}
 
-	schema, err := a.ProjectSchemaRepo.ProjectSchemaFetchBySchemaID(a.ctx, schemaID)
+	projectSchema, err := a.ProjectSchemaRepo.ProjectSchemaFetchBySchemaID(a.ctx, schemaID)
 	if err != nil {
 		logger.Logger.Error("Failed to fetch schema by id", "error", err)
 		return err
 	}
 
-	if !a.checkIfOnlyDDL(schema.DDL_SQL) {
+	if !a.checkIfOnlyDDL(projectSchema.DDL_SQL) {
 		return errors.New("only DDL statements are allowed in schema changes")
 	}
 
-	destructive, err := a.checkIfDDLDestructive(projectID, schema.DDL_SQL)
+	destructive, err := a.checkIfDDLDestructive(projectID, projectSchema.DDL_SQL)
 	if err != nil {
 		logger.Logger.Error("Failed to validate destructive DDL", "error", err)
 		return err
@@ -444,13 +457,39 @@ func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
 		return errors.New("destructive DDL is not allowed after initial schema")
 	}
 
+	logger.Logger.Info(
+		"Applying committed schema to metadata",
+		"project_id", projectID,
+		"schema_id", schemaID,
+	)
+
+	err = a.SchemaService.ApplyDDLAndRecomputeShardKeys(
+		a.ctx,
+		projectID,
+		projectSchema.DDL_SQL,
+	)
+	if err != nil {
+		logger.Logger.Error(
+			"Failed to apply schema to metadata",
+			"project_id", projectID,
+			"schema_id", schemaID,
+			"error", err,
+		)
+		return err
+	}
+
 	err = a.ProjectSchemaRepo.ProjectSchemaCommitDraft(a.ctx, schemaID)
 	if err != nil {
 		logger.Logger.Error("Failed to commit project schema", "error", err)
 		return err
 	}
 
-	logger.Logger.Info("Successfully committed project schema", "schema_id", schemaID)
+	logger.Logger.Info(
+		"Successfully committed project schema",
+		"project_id", projectID,
+		"schema_id", schemaID,
+	)
+
 	return nil
 }
 

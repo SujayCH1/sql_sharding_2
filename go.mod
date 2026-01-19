@@ -9,6 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
+	github.com/pganalyze/pg_query_go/v5 v5.1.0
 	github.com/wailsapp/wails/v2 v2.11.0
 )
 
@@ -39,6 +40,7 @@ require (
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
+	google.golang.org/protobuf v1.36.7 // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.11.0 => /home/sujay/go/pkg/mod
