@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sql-sharding-v2/internal/connections"
+	"sql-sharding-v2/internal/executor"
 	"sql-sharding-v2/internal/loader"
 	"sql-sharding-v2/internal/repository"
 	"sql-sharding-v2/internal/router"
@@ -37,6 +38,7 @@ type App struct {
 	SchemaService    *schema.SchemaService
 	InferenceService *shardkey.InferenceService
 	RouterService    *router.RouterService
+	ExecutorService  *executor.Executor
 }
 
 // NewApp creates a new App application struct
@@ -104,6 +106,10 @@ func (a *App) startup(ctx context.Context) {
 		logger.Logger.Error("Failed to initiate connection for active project", "error", err)
 		// panic(err)
 	}
+
+	a.ExecutorService = executor.NewExecutor(
+		a.ShardConnectionStore,
+	)
 
 	logger.Logger.Info("Application startup successful!")
 
@@ -702,6 +708,29 @@ func (a *App) ReplaceShardKeys(projectID string, keys []repository.ShardKeyRecor
 // 	logger.Logger.Info("scucessfully updated shard keys", "project_id", projectID)
 // 	return nil
 // }
+
+func (a *App) ExecuteSQL(
+	projectID string,
+	sqlText string,
+) ([]executor.ExecutionResult, error) {
+
+	plan, err := a.RouterService.RouteSQL(
+		a.ctx,
+		projectID,
+		sqlText,
+	)
+	if err != nil {
+		logger.Logger.Error("Filed to route and execute query", "error", err)
+		return nil, err
+	}
+
+	return a.ExecutorService.Execute(
+		a.ctx,
+		projectID,
+		sqlText,
+		plan,
+	)
+}
 
 // helper to pass repos to DDL executor
 func (a *App) execDDLonShard(
