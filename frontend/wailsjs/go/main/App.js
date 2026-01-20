@@ -74,6 +74,10 @@ export function FetchProjectStatus(arg1) {
   return window['go']['main']['App']['FetchProjectStatus'](arg1);
 }
 
+export function FetchShardKeys(arg1) {
+  return window['go']['main']['App']['FetchShardKeys'](arg1);
+}
+
 export function FetchShardStatus(arg1) {
   return window['go']['main']['App']['FetchShardStatus'](arg1);
 }
@@ -104,6 +108,14 @@ export function ListProjects() {
 
 export function ListShards(arg1) {
   return window['go']['main']['App']['ListShards'](arg1);
+}
+
+export function RecomputeKeys(arg1) {
+  return window['go']['main']['App']['RecomputeKeys'](arg1);
+}
+
+export function ReplaceShardKeys(arg1, arg2) {
+  return window['go']['main']['App']['ReplaceShardKeys'](arg1, arg2);
 }
 
 export function RetrySchemaExecution(arg1) {

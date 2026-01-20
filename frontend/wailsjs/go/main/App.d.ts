@@ -38,6 +38,8 @@ export function FetchProjectByID(arg1:string):Promise<repository.Project>;
 
 export function FetchProjectStatus(arg1:string):Promise<string>;
 
+export function FetchShardKeys(arg1:string):Promise<Array<repository.ShardKeys>>;
+
 export function FetchShardStatus(arg1:string):Promise<string>;
 
 export function GetCurrentSchema(arg1:string):Promise<repository.ProjectSchema>;
@@ -53,6 +55,10 @@ export function GetSchemaHistory(arg1:string):Promise<Array<repository.ProjectSc
 export function ListProjects():Promise<Array<repository.Project>>;
 
 export function ListShards(arg1:string):Promise<Array<repository.Shard>>;
+
+export function RecomputeKeys(arg1:string):Promise<void>;
+
+export function ReplaceShardKeys(arg1:string,arg2:Array<repository.ShardKeyRecord>):Promise<void>;
 
 export function RetrySchemaExecution(arg1:string):Promise<void>;
 

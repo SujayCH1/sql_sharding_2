@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// ShardKeys represents a row in table_shard_keys (read model)
 type ShardKeys struct {
 	ProjectID        string    `json:"project_id"`
 	TableName        string    `json:"table_name"`
@@ -15,27 +14,20 @@ type ShardKeys struct {
 	UpdatedAt        time.Time `json:"updated_at"`
 }
 
-// ShardKeyRecord is a write-only DTO used for inserts/replacements
-// avoids importing inference/service packages.
 type ShardKeyRecord struct {
 	TableName      string
 	ShardKeyColumn string
 	IsManual       bool
 }
 
-// repository
 type ShardKeysRepository struct {
 	db *sql.DB
 }
 
-// constructor
 func NewShardKeysRepository(db *sql.DB) *ShardKeysRepository {
-	return &ShardKeysRepository{
-		db: db,
-	}
+	return &ShardKeysRepository{db: db}
 }
 
-// fetches all shard keys for a project
 func (s *ShardKeysRepository) FetchShardKeysByProjectID(
 	ctx context.Context,
 	projectID string,
@@ -77,48 +69,6 @@ func (s *ShardKeysRepository) FetchShardKeysByProjectID(
 	return keys, rows.Err()
 }
 
-// inserts a single shard key row
-func (s *ShardKeysRepository) AddShardKey(
-	ctx context.Context,
-	projectID string,
-	record ShardKeyRecord,
-) error {
-
-	query := `
-		INSERT INTO table_shard_keys
-		(project_id, table_name, shard_key_column, is_manual_override, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`
-
-	_, err := s.db.ExecContext(
-		ctx,
-		query,
-		projectID,
-		record.TableName,
-		record.ShardKeyColumn,
-		record.IsManual,
-		time.Now(),
-	)
-
-	return err
-}
-
-// deletes all shard keys for a project
-func (s *ShardKeysRepository) DeleteShardKeysByProjectID(
-	ctx context.Context,
-	projectID string,
-) error {
-
-	query := `
-		DELETE FROM table_shard_keys
-		WHERE project_id = $1
-	`
-
-	_, err := s.db.ExecContext(ctx, query, projectID)
-	return err
-}
-
-// replaces inferred shard keys atomically.
 func (s *ShardKeysRepository) ReplaceShardKeysForProject(
 	ctx context.Context,
 	projectID string,
@@ -144,6 +94,11 @@ func (s *ShardKeysRepository) ReplaceShardKeysForProject(
 		INSERT INTO table_shard_keys
 		(project_id, table_name, shard_key_column, is_manual_override, updated_at)
 		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (project_id, table_name)
+		DO UPDATE SET
+		  shard_key_column = EXCLUDED.shard_key_column,
+		  is_manual_override = EXCLUDED.is_manual_override,
+		  updated_at = EXCLUDED.updated_at
 	`
 
 	now := time.Now()

@@ -76,3 +76,18 @@ func (s *SchemaService) ApplyDDLAndRecomputeShardKeys(
 
 	return nil
 }
+
+// ensures all internal maps/slices are initialized.
+// required for inference, which assumes strict invariants.
+func NormalizeLogicalSchema(s *LogicalSchema) {
+	for _, table := range s.Tables {
+
+		if table.Columns == nil {
+			table.Columns = make(map[string]*Column)
+		}
+
+		if table.FKs == nil {
+			table.FKs = make(map[FKKey]*FK)
+		}
+	}
+}

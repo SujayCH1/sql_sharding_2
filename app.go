@@ -7,6 +7,7 @@ import (
 	"sql-sharding-v2/internal/loader"
 	"sql-sharding-v2/internal/repository"
 	"sql-sharding-v2/internal/schema"
+	"sql-sharding-v2/internal/shardkey"
 	"sql-sharding-v2/pkg/logger"
 )
 
@@ -22,13 +23,15 @@ type App struct {
 	SchemaExecutionStatusRepo *repository.SchemaExecutionStatusRepository
 	ColumnsRepo               *repository.ColumnRepository
 	FKEdgesRepo               *repository.FKEdgesRepository
+	ShardKeysRepo             *repository.ShardKeysRepository
 
 	// conn layer
 	ShardConnectionStore   *connections.ConnectionStore
 	ShardConnectionManager *connections.ConnectionManager
 
 	//services
-	SchemaService *schema.SchemaService
+	SchemaService    *schema.SchemaService
+	InferenceService *shardkey.InferenceService
 }
 
 // NewApp creates a new App application struct
@@ -59,6 +62,7 @@ func (a *App) startup(ctx context.Context) {
 	a.SchemaExecutionStatusRepo = repository.NewSchemaExecutionStatusRepository(db)
 	a.ColumnsRepo = repository.NewColumnsRepository(db)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(db)
+	a.ShardKeysRepo = repository.NewShardKeysRepository(db)
 
 	// stores
 	a.ShardConnectionStore = connections.NewConnectionStore()
@@ -75,6 +79,11 @@ func (a *App) startup(ctx context.Context) {
 	a.SchemaService = schema.NewSchemaService(
 		a.ColumnsRepo,
 		a.FKEdgesRepo,
+	)
+	a.InferenceService = shardkey.NewInferenceService(
+		a.ColumnsRepo,
+		a.FKEdgesRepo,
+		a.ShardKeysRepo,
 	)
 
 	err = a.ShardConnectionManager.InitiateActiveConnections(ctx)
@@ -444,9 +453,9 @@ func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
 		return err
 	}
 
-	if !a.checkIfOnlyDDL(projectSchema.DDL_SQL) {
-		return errors.New("only DDL statements are allowed in schema changes")
-	}
+	// if !a.checkIfOnlyDDL(projectSchema.DDL_SQL) {
+	// 	return errors.New("only DDL statements are allowed in schema changes")
+	// }
 
 	destructive, err := a.checkIfDDLDestructive(projectID, projectSchema.DDL_SQL)
 	if err != nil {
@@ -613,6 +622,73 @@ func (a *App) RetrySchemaExecution(projectID string) error {
 		a.SchemaExecutionStatusRepo,
 	)
 }
+
+// shardkey service - run inference
+func (a *App) RecomputeKeys(projectID string) error {
+
+	err := a.InferenceService.ApplyShardKeyInference(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("shard key inference failed", "project_id", projectID, "error", err)
+		return err
+	}
+
+	logger.Logger.Info("shard key inference completed successfully", "project_id", projectID)
+	return nil
+
+}
+
+// shard keys repository - fetch keys
+func (a *App) FetchShardKeys(projectID string) ([]repository.ShardKeys, error) {
+
+	keys, err := a.ShardKeysRepo.FetchShardKeysByProjectID(a.ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("failed to fetch shard keys", "project_id", projectID, "error", err)
+		return nil, err
+	}
+
+	logger.Logger.Info("fetched shard keys successfully", "project_id", projectID, "count", len(keys))
+	return keys, nil
+
+}
+
+// shard keys repository - replace keys
+func (a *App) ReplaceShardKeys(projectID string, keys []repository.ShardKeyRecord) error {
+
+	err := a.ShardKeysRepo.ReplaceShardKeysForProject(a.ctx, projectID, keys)
+	if err != nil {
+		logger.Logger.Error("filed to replace shard keys", "projectID", projectID)
+		return err
+	}
+
+	logger.Logger.Info("successfully replaced shard keys", "projectID", projectID)
+	return nil
+}
+
+// func (a *App) UpdateManualShardKey(
+// 	projectID string,
+// 	tableName string,
+// 	shardKey string,
+// ) error {
+
+// 	err := a.ShardKeysRepo.UpsertManualShardKey(
+// 		a.ctx,
+// 		projectID,
+// 		tableName,
+// 		shardKey,
+// 	)
+// 	if err != nil {
+// 		logger.Logger.Error(
+// 			"failed to upsert manual shard key",
+// 			"project_id", projectID,
+// 			"table", tableName,
+// 			"error", err,
+// 		)
+// 		return err
+// 	}
+
+// 	logger.Logger.Info("scucessfully updated shard keys", "project_id", projectID)
+// 	return nil
+// }
 
 // helper to pass repos to DDL executor
 func (a *App) execDDLonShard(
