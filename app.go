@@ -6,6 +6,7 @@ import (
 	"sql-sharding-v2/internal/connections"
 	"sql-sharding-v2/internal/loader"
 	"sql-sharding-v2/internal/repository"
+	"sql-sharding-v2/internal/router"
 	"sql-sharding-v2/internal/schema"
 	"sql-sharding-v2/internal/shardkey"
 	"sql-sharding-v2/pkg/logger"
@@ -14,6 +15,9 @@ import (
 // App struct
 type App struct {
 	ctx context.Context
+
+	//config
+	RouterConfig router.RouterConfig
 
 	// repository
 	ProjectRepo               *repository.ProjectRepository
@@ -32,6 +36,7 @@ type App struct {
 	//services
 	SchemaService    *schema.SchemaService
 	InferenceService *shardkey.InferenceService
+	RouterService    *router.RouterService
 }
 
 // NewApp creates a new App application struct
@@ -53,6 +58,9 @@ func (a *App) startup(ctx context.Context) {
 	if err != nil {
 		panic(err)
 	}
+
+	//config
+	a.RouterConfig = router.DefaultRouterConfig()
 
 	// repos
 	a.ProjectRepo = repository.NewProjectRepository(db)
@@ -84,6 +92,11 @@ func (a *App) startup(ctx context.Context) {
 		a.ColumnsRepo,
 		a.FKEdgesRepo,
 		a.ShardKeysRepo,
+	)
+	a.RouterService = router.NewRouterService(
+		a.ShardKeysRepo,
+		a.ShardRepo,
+		a.RouterConfig,
 	)
 
 	err = a.ShardConnectionManager.InitiateActiveConnections(ctx)
