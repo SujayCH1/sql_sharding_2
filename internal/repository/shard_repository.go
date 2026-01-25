@@ -34,7 +34,7 @@ func NewShardRepository(shd *sql.DB) *ShardRepository {
 func (s *ShardRepository) ShardAdd(ctx context.Context, projectID string) (*Shard, error) {
 	var shard Shard
 
-	indexes, err := s.fetchShardIndexes(ctx, projectID)
+	indexes, err := s.FetchShardIndexes(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (s *ShardRepository) FetchShardStatus(ctx context.Context, shardID string) 
 }
 
 // helper to fetch indexes from database (PROJECT SCOPED)
-func (s *ShardRepository) fetchShardIndexes(ctx context.Context, projectID string) ([]int, error) {
+func (s *ShardRepository) FetchShardIndexes(ctx context.Context, projectID string) ([]int, error) {
 	query := `
 		SELECT shard_index FROM shards WHERE project_id = $1
 	`
@@ -246,6 +246,34 @@ func (s *ShardRepository) fetchShardIndexes(ctx context.Context, projectID strin
 	}
 
 	return indexList, nil
+}
+
+// func to fetch poject ID using shard
+func (s *ShardRepository) FetchProjectID(ctx context.Context, shardID string) (string, error) {
+
+	query := `
+		SELECT project_id
+		FROM shards
+		WHERE id = $1
+	`
+
+	row := s.shd.QueryRowContext(
+		ctx,
+		query,
+		shardID,
+	)
+
+	var projectID string
+
+	err := row.Scan(
+		&projectID,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return projectID, nil
+
 }
 
 // helper to calculate shard index

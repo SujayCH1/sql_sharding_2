@@ -62,6 +62,10 @@ export function ExecuteProjectSchema(arg1) {
   return window['go']['main']['App']['ExecuteProjectSchema'](arg1);
 }
 
+export function ExecuteSQL(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteSQL'](arg1, arg2);
+}
+
 export function FetchConnectionInfo(arg1) {
   return window['go']['main']['App']['FetchConnectionInfo'](arg1);
 }
@@ -108,6 +112,10 @@ export function ListProjects() {
 
 export function ListShards(arg1) {
   return window['go']['main']['App']['ListShards'](arg1);
+}
+
+export function MonitorShards(arg1) {
+  return window['go']['main']['App']['MonitorShards'](arg1);
 }
 
 export function RecomputeKeys(arg1) {

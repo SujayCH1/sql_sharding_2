@@ -234,3 +234,49 @@ func (r *SchemaExecutionStatusRepository) ExecutionRecordsCheckAppliedAll(
 
 	return count == 0, nil
 }
+
+// func to fetch execution status using shard id
+func (r *SchemaExecutionStatusRepository) ExecutionStatusFetchStatusByShardID(
+	ctx context.Context,
+	shardID string,
+) ([]SchemaExecutionStatus, error) {
+
+	query := `
+		SELECT
+			id, schema_id, shard_id, state, error_messgae, executed_at
+		FROM schema_execution_status
+		WHERE shard_id = $!
+	`
+
+	rows, err := r.schmExeSt.QueryContext(
+		ctx,
+		query,
+		shardID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	var records []SchemaExecutionStatus
+	var record SchemaExecutionStatus
+
+	for rows.Next() {
+
+		err := rows.Scan(
+			&record.ID,
+			&record.SchemaID,
+			&record.ShardID,
+			&record.State,
+			&record.ErrMsg,
+			&record.ExecutedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		records = append(records, record)
+	}
+
+	return records, nil
+
+}

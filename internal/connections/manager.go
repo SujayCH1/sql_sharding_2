@@ -27,6 +27,7 @@ func NewConnectionManager(
 	}
 }
 
+// func to get and store connection for all active shards
 func (m *ConnectionManager) InitiateActiveConnections(ctx context.Context) error {
 
 	activeProj, err := m.projectRepo.FetchActiveProject(ctx)
@@ -65,4 +66,21 @@ func (m *ConnectionManager) InitiateActiveConnections(ctx context.Context) error
 
 	logger.Logger.Info("Sucessfully initiated shard connections for active project")
 	return nil
+}
+
+// func to ping a shardto check its connection status
+func (m *ConnectionManager) CheckConnectionHealth(ctx context.Context, projectID string, shardID string) (bool, error) {
+
+	conn, err := m.store.Get(projectID, shardID)
+	if err != nil {
+		return false, err
+	}
+
+	err = conn.Ping()
+	if err != nil {
+		return false, err
+	}
+
+	return true, nil
+
 }

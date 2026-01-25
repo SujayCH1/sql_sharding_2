@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"net/http"
+	"sql-sharding-v2/internal/api"
 	"sql-sharding-v2/internal/connections"
 	"sql-sharding-v2/internal/executor"
 	"sql-sharding-v2/internal/loader"
@@ -11,11 +13,17 @@ import (
 	"sql-sharding-v2/internal/schema"
 	"sql-sharding-v2/internal/shardkey"
 	"sql-sharding-v2/pkg/logger"
+	"time"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
 	ctx context.Context
+
+	// http
+	httpServer *http.Server
 
 	//config
 	RouterConfig router.RouterConfig
@@ -110,6 +118,25 @@ func (a *App) startup(ctx context.Context) {
 	a.ExecutorService = executor.NewExecutor(
 		a.ShardConnectionStore,
 	)
+
+	//api
+	mux := http.NewServeMux()
+	apiHandler := api.NewHandler(a)
+	api.RegisterRoutes(mux, apiHandler)
+	a.httpServer = &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+
+	go func() {
+		logger.Logger.Info("HTTP server started", "addr", ":8080")
+		if err := a.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Logger.Error("HTTP server failed", "error", err)
+		}
+	}()
+
+	// funcs
+	a.MonitorShards(a.ctx)
 
 	logger.Logger.Info("Application startup successful!")
 
@@ -217,15 +244,45 @@ func (a *App) ListShards(projectID string) ([]repository.Shard, error) {
 }
 
 // shard repository - Call to deactivate a shard
-func (a *App) DeactivateShard(shardID string) error {
+func (a *App) DeactivateShard(
+	shardID string,
+) error {
 
-	err := a.ShardRepo.ShardDeactivate(a.ctx, shardID)
-	if err != nil {
+	if err := a.ShardRepo.ShardDeactivate(a.ctx, shardID); err != nil {
 		logger.Logger.Error("Failed to deactivate shard", "error", err)
 		return err
 	}
 
-	logger.Logger.Info("Successfully deactivated shard", "shard_id", shardID)
+	projectID, err := a.ShardRepo.FetchProjectID(a.ctx, shardID)
+
+	shards, err := a.ListShards(projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch shard status", "error", err)
+		return err
+	}
+
+	for _, shard := range shards {
+		if shard.Status == "inactive" {
+
+			if err := a.ProjectRepo.ProjectDeactivate(a.ctx, projectID); err != nil {
+				logger.Logger.Error("Failed to deactivate project", "error", err)
+				return err
+			}
+
+			runtime.EventsEmit(a.ctx, "project:status_changed", map[string]string{
+				"project_id": projectID,
+				"status":     "inactive",
+			})
+
+			break
+		}
+	}
+
+	logger.Logger.Info(
+		"Successfully deactivated shard",
+		"shard_id", shardID,
+		"project_id", projectID,
+	)
 
 	return nil
 }
@@ -683,32 +740,7 @@ func (a *App) ReplaceShardKeys(projectID string, keys []repository.ShardKeyRecor
 	return nil
 }
 
-// func (a *App) UpdateManualShardKey(
-// 	projectID string,
-// 	tableName string,
-// 	shardKey string,
-// ) error {
-
-// 	err := a.ShardKeysRepo.UpsertManualShardKey(
-// 		a.ctx,
-// 		projectID,
-// 		tableName,
-// 		shardKey,
-// 	)
-// 	if err != nil {
-// 		logger.Logger.Error(
-// 			"failed to upsert manual shard key",
-// 			"project_id", projectID,
-// 			"table", tableName,
-// 			"error", err,
-// 		)
-// 		return err
-// 	}
-
-// 	logger.Logger.Info("scucessfully updated shard keys", "project_id", projectID)
-// 	return nil
-// }
-
+// func to execute DML quereis on repective schema
 func (a *App) ExecuteSQL(
 	projectID string,
 	sqlText string,
@@ -730,6 +762,23 @@ func (a *App) ExecuteSQL(
 		sqlText,
 		plan,
 	)
+}
+
+// func to continuously check  health of shards of projects
+func (a *App) MonitorShards(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Logger.Info("Shard monitor stopped")
+			return
+
+		case <-ticker.C:
+			a.checkAllShards(ctx)
+		}
+	}
 }
 
 // helper to pass repos to DDL executor

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
+	"sql-sharding-v2/pkg/logger"
 	"strings"
 )
 
-// helper to ActivateProject in app.go
+// PROJECT ACTIVATION CONDITION
+
 // to see if there are any other active projects before shard activation
 func (a *App) checkAllProjectsInactive() (bool, error) {
 
@@ -23,7 +26,6 @@ func (a *App) checkAllProjectsInactive() (bool, error) {
 	return true, nil
 }
 
-// helper func to ActivateProject in app.go
 // to see if all project shards are active before project activation
 func (a *App) checkAllShardsActive(projectID string) (bool, error) {
 
@@ -45,7 +47,55 @@ func (a *App) checkAllShardsActive(projectID string) (bool, error) {
 	return true, nil
 }
 
-// helper func to DeleteShard in app.gp
+// to see if all drafts are commited before project activation
+func (a *App) checkAllSchemaApplied(projectId string) (bool, error) {
+
+	shards, err := a.ShardRepo.ShardList(a.ctx, projectId)
+	if err != nil {
+		return false, err
+	}
+
+	for _, shard := range shards {
+
+		statuses, err := a.SchemaExecutionStatusRepo.ExecutionStatusFetchStatusByShardID(a.ctx, shard.ID)
+		if err != nil {
+			return false, err
+		}
+
+		for _, status := range statuses {
+
+			if status.State != "applied" {
+				return false, nil
+			}
+
+		}
+
+	}
+
+	return true, nil
+
+}
+
+// SHARD ACTIVATION CODNITION
+
+// too see if shard is connected before activating it
+func (a *App) checkIfShardConnected(projectId string, shardId string) (bool, error) {
+
+	status, err := a.checkShardHealth(a.ctx, projectId, shardId)
+	if err != nil {
+		return false, err
+	}
+
+	if status == false {
+		return false, nil
+	}
+
+	return true, nil
+
+}
+
+// SHARD DELETION CONDITION
+
 // to check if the shard isdeactivated before it is deleted
 func (a *App) checkIfShardInactive(shardID string) (bool, error) {
 
@@ -60,6 +110,8 @@ func (a *App) checkIfShardInactive(shardID string) (bool, error) {
 
 	return true, nil
 }
+
+// SCHEMA COMMIT CONDITION
 
 // to check if the project is inactive before committing in the schema
 func (a *App) checkIfProjectInactive(projectID string) (bool, error) {
@@ -106,6 +158,8 @@ func (a *App) checkIfSchemaInFlight(projectID string) (bool, error) {
 	return false, nil
 }
 
+// SCHEMA VALIDATION CONDITION
+
 // to check if DDL is destructive after first committed schema
 func (a *App) checkIfDDLDestructive(projectID string, ddlSQL string) (bool, error) {
 
@@ -150,4 +204,47 @@ func (a *App) checkIfOnlyDDL(ddlSQL string) bool {
 	}
 
 	return true
+}
+
+// SHARD HEALTH CHECK
+
+// func to ping all shards
+func (a *App) checkAllShards(ctx context.Context) {
+	projectID, err := a.ProjectRepo.FetchActiveProject(ctx)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch active project", "error", err)
+		return
+	}
+
+	shards, err := a.ShardRepo.ShardList(ctx, projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to list shards", "error", err)
+		return
+	}
+
+	for _, shard := range shards {
+		healthy, err := a.checkShardHealth(ctx, projectID, shard.ID)
+		if err != nil || !healthy {
+
+			_ = a.DeactivateShard(shard.ID)
+
+			logger.Logger.Warn(
+				"Shard became inactive",
+				"projectID", projectID,
+				"shardID", shard.ID,
+			)
+		}
+	}
+
+}
+
+// helper func to ping a shard
+func (a *App) checkShardHealth(
+	ctx context.Context,
+	projectID string,
+	shardID string,
+) (bool, error) {
+
+	return a.ShardConnectionManager.
+		CheckConnectionHealth(ctx, projectID, shardID)
 }
