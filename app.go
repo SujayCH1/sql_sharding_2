@@ -941,7 +941,25 @@ func (a *App) RetrySchemaExecution(projectID string) error {
 // shardkey service - run inference
 func (a *App) RecomputeKeys(projectID string) error {
 
-	err := a.InferenceService.ApplyShardKeyInference(a.ctx, projectID)
+	isProjectActive, err := a.checkIfProjectInactive(projectID)
+	if err != nil {
+		logger.Logger.Error("failed to recompute shard keys", "project_id", projectID, "error", err)
+		a.emitter.Error("Shard key recomputation failed", "application -RecomputeKeys", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
+		return err
+	}
+
+	if !isProjectActive {
+		a.emitter.Error("Shard key recomputation failed", "application -RecomputeKeys", map[string]string{
+			"project_id": projectID,
+			"error":      "project must be inactive before shard key recomputation",
+		})
+		return err
+	}
+
+	err = a.InferenceService.ApplyShardKeyInference(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("shard key inference failed", "project_id", projectID, "error", err)
 		a.emitter.Error("Shard key recomputation failed", "application -RecomputeKeys", map[string]string{
@@ -955,6 +973,7 @@ func (a *App) RecomputeKeys(projectID string) error {
 	a.emitter.Info("Shard key recomputation successfull	", "application -RecomputeKeys", map[string]string{
 		"project_id": projectID,
 	})
+
 	return nil
 
 }
