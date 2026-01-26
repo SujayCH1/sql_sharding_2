@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// PROJECT ACTIVATION CONDITION
+// PROJECT ACTIVATION CONDITION ----------------------------------------
 
 // to see if there are any other active projects before shard activation
 func (a *App) checkAllProjectsInactive() (bool, error) {
@@ -76,7 +76,7 @@ func (a *App) checkAllSchemaApplied(projectId string) (bool, error) {
 
 }
 
-// SHARD ACTIVATION CODNITION
+// SHARD ACTIVATION CODNITION ----------------------------------------
 
 // too see if shard is connected before activating it
 func (a *App) checkIfShardConnected(projectId string, shardId string) (bool, error) {
@@ -94,7 +94,7 @@ func (a *App) checkIfShardConnected(projectId string, shardId string) (bool, err
 
 }
 
-// SHARD DELETION CONDITION
+// SHARD DELETION CONDITION ----------------------------------------
 
 // to check if the shard isdeactivated before it is deleted
 func (a *App) checkIfShardInactive(shardID string) (bool, error) {
@@ -111,7 +111,7 @@ func (a *App) checkIfShardInactive(shardID string) (bool, error) {
 	return true, nil
 }
 
-// SCHEMA COMMIT CONDITION
+// SCHEMA COMMIT CONDITION ----------------------------------------
 
 // to check if the project is inactive before committing in the schema
 func (a *App) checkIfProjectInactive(projectID string) (bool, error) {
@@ -158,7 +158,7 @@ func (a *App) checkIfSchemaInFlight(projectID string) (bool, error) {
 	return false, nil
 }
 
-// SCHEMA VALIDATION CONDITION
+// SCHEMA VALIDATION CONDITION ----------------------------------------
 
 // to check if DDL is destructive after first committed schema
 func (a *App) checkIfDDLDestructive(projectID string, ddlSQL string) (bool, error) {
@@ -206,7 +206,7 @@ func (a *App) checkIfOnlyDDL(ddlSQL string) bool {
 	return true
 }
 
-// SHARD HEALTH CHECK
+// SHARD HEALTH CHECK ----------------------------------------
 
 // func to ping all shards
 func (a *App) checkAllShards(ctx context.Context) {

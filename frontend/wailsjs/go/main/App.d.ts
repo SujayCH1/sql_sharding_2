@@ -68,4 +68,6 @@ export function ReplaceShardKeys(arg1:string,arg2:Array<repository.ShardKeyRecor
 
 export function RetrySchemaExecution(arg1:string):Promise<void>;
 
+export function RetryShardConnections(arg1:context.Context):Promise<void>;
+
 export function UpdateConnection(arg1:repository.ShardConnection):Promise<void>;

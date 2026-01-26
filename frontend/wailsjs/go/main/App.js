@@ -130,6 +130,10 @@ export function RetrySchemaExecution(arg1) {
   return window['go']['main']['App']['RetrySchemaExecution'](arg1);
 }
 
+export function RetryShardConnections(arg1) {
+  return window['go']['main']['App']['RetryShardConnections'](arg1);
+}
+
 export function UpdateConnection(arg1) {
   return window['go']['main']['App']['UpdateConnection'](arg1);
 }

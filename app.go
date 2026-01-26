@@ -109,7 +109,7 @@ func (a *App) startup(ctx context.Context) {
 		a.RouterConfig,
 	)
 
-	err = a.ShardConnectionManager.InitiateActiveConnections(ctx)
+	err = a.ShardConnectionManager.InititateConnectionsAll(ctx)
 	if err != nil {
 		logger.Logger.Error("Failed to initiate connection for active project", "error", err)
 		// panic(err)
@@ -141,21 +141,6 @@ func (a *App) startup(ctx context.Context) {
 	logger.Logger.Info("Application startup successful!")
 
 }
-
-// var ProjectRepo repository.ProjectRepository = *repository.NewProjectRepository(config.ApplicationDatabaseConnection.ConnInst)
-
-// var ShardRepo repository.ShardRepository = *repository.NewShardRepository(config.ApplicationDatabaseConnection.ConnInst)
-
-// var ShardConnectionRepo repository.ShardConnectionRepository = *repository.NewShardConnectionRepository(config.ApplicationDatabaseConnection.ConnInst)
-
-// var ShardConnectionStore connections.ConnectionStore = *connections.NewConnectionStore()
-
-// var ShardConnectionManager connections.ConnectionManager = *connections.NewConnectionManager(
-// 	&ShardConnectionStore,
-// 	&ProjectRepo,
-// 	&ShardRepo,
-// 	&ShardConnectionRepo,
-// )
 
 // project repository - Call to add a new project
 func (a *App) CreateProject(name string, description string) (*repository.Project, error) {
@@ -332,7 +317,29 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 // shard repository - Call to activate a shard
 func (a *App) ActivateShard(shardID string) error {
 
-	err := a.ShardRepo.ShardActivate(a.ctx, shardID)
+	err := a.RetryShardConnections(a.ctx)
+	if err != nil {
+		logger.Logger.Error("Failed to activate shard", "Retry mechanism", err)
+	}
+
+	projectID, err := a.ShardRepo.FetchProjectID(a.ctx, shardID)
+	if err != nil {
+		logger.Logger.Error("Failed to activate shard", "error", err)
+		return err
+	}
+
+	isConnected, err := a.checkShardHealth(a.ctx, projectID, shardID)
+	if err != nil {
+		logger.Logger.Error("Failed to activate shard", "error", err, "projectid", projectID)
+		return err
+	}
+
+	if !isConnected {
+		logger.Logger.Error("Failed to activate shard", "error", "shard connection not available")
+		return err
+	}
+
+	err = a.ShardRepo.ShardActivate(a.ctx, shardID)
 	if err != nil {
 		logger.Logger.Error("Failed to activate shard", "error", err)
 		return err
@@ -445,7 +452,7 @@ func (a *App) Activateproject(projectID string) error {
 
 	logger.Logger.Info("Initiating shard connection for active projects")
 
-	err = a.ShardConnectionManager.InitiateActiveConnections(a.ctx)
+	err = a.ShardConnectionManager.InititateConnectionsAll(a.ctx)
 
 	logger.Logger.Info("Successfully activated the project", "project_id", projectID)
 
@@ -779,6 +786,18 @@ func (a *App) MonitorShards(ctx context.Context) {
 			a.checkAllShards(ctx)
 		}
 	}
+}
+
+// func to retry all projects shard connections
+func (a *App) RetryShardConnections(ctx context.Context) error {
+
+	err := a.ShardConnectionManager.InititateConnectionsAll(a.ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
 }
 
 // helper to pass repos to DDL executor

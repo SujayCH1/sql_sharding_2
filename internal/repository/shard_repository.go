@@ -248,7 +248,7 @@ func (s *ShardRepository) FetchShardIndexes(ctx context.Context, projectID strin
 	return indexList, nil
 }
 
-// func to fetch poject ID using shard
+// func to fetch project ID using shard
 func (s *ShardRepository) FetchProjectID(ctx context.Context, shardID string) (string, error) {
 
 	query := `
