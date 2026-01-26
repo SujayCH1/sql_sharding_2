@@ -512,6 +512,11 @@ func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
 		return errors.New("project must be inactive to modify schema")
 	}
 
+	// ok, err = a.checkAllShardsActive(projectID)
+	// if !ok {
+	// 	return errors.New("project shards and not active")
+	// }
+
 	ok, err = a.checkIfSchemaDraft(schemaID)
 	if err != nil {
 		logger.Logger.Error("Failed to fetch schema state", "error", err)
@@ -668,13 +673,13 @@ func (a *App) GetProjectSchemaStatus(schemaID string) (string, error) {
 // DDL executor - execute pending schema
 func (a *App) ExecuteProjectSchema(projectID string) error {
 
-	status, err := a.ProjectRepo.FetchProjectStatus(a.ctx, projectID)
+	caps, err := a.GetSchemaCapabilities(projectID)
 	if err != nil {
 		return err
 	}
 
-	if status == "inactive" {
-		return errors.New("Active project first")
+	if !caps.CanExecute {
+		return errors.New("schema execution not allowed")
 	}
 
 	err = schema.ExecuteProjectSchema(
@@ -798,6 +803,54 @@ func (a *App) RetryShardConnections(ctx context.Context) error {
 
 	return nil
 
+}
+
+// allows flow of schema draft -> execute in fe
+func (a *App) GetSchemaCapabilities(projectID string) (*SchemaCapabilities, error) {
+	caps := &SchemaCapabilities{}
+
+	projectStatus, err := a.FetchProjectStatus(projectID)
+	if err != nil {
+		return nil, err
+	}
+
+	schema, _ := a.GetCurrentSchema(projectID)
+
+	if projectStatus == "active" {
+		caps.Reason = "Project is active"
+		return caps, nil
+	}
+
+	if schema == nil {
+		caps.CanCreateDraft = true
+		return caps, nil
+	}
+
+	switch schema.State {
+
+	case "draft":
+		caps.CanEditDraft = true
+		caps.CanCommit = true
+
+	case "pending":
+		allActive, err := a.checkAllShardsActive(projectID)
+		if err != nil {
+			return nil, err
+		}
+		if allActive {
+			caps.CanExecute = true
+		} else {
+			caps.Reason = "All shards must be active to execute"
+		}
+
+	case "failed":
+		caps.CanRetry = true
+
+	case "applied":
+		caps.CanCreateDraft = true
+	}
+
+	return caps, nil
 }
 
 // helper to pass repos to DDL executor

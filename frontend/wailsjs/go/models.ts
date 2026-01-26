@@ -23,6 +23,33 @@ export namespace executor {
 
 }
 
+export namespace main {
+	
+	export class SchemaCapabilities {
+	    can_create_draft: boolean;
+	    can_edit_draft: boolean;
+	    can_commit: boolean;
+	    can_execute: boolean;
+	    can_retry: boolean;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SchemaCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.can_create_draft = source["can_create_draft"];
+	        this.can_edit_draft = source["can_edit_draft"];
+	        this.can_commit = source["can_commit"];
+	        this.can_execute = source["can_execute"];
+	        this.can_retry = source["can_retry"];
+	        this.reason = source["reason"];
+	    }
+	}
+
+}
+
 export namespace repository {
 	
 	export class Project {

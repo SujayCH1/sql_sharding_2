@@ -9,14 +9,23 @@ import {
   CommitSchemaDraft,
   DeleteSchemaDraft,
   GetCurrentSchema,
-  FetchProjectStatus,
   ExecuteProjectSchema,
   RetrySchemaExecution,
+  GetSchemaCapabilities,
 } from "../../../../wailsjs/go/main/App"
 
 import type { repository } from "../../../../wailsjs/go/models"
 
 type ProjectSchema = repository.ProjectSchema
+
+type SchemaCapabilities = {
+  can_create_draft: boolean
+  can_edit_draft: boolean
+  can_commit: boolean
+  can_execute: boolean
+  can_retry: boolean
+  reason?: string
+}
 
 type Props = {
   projectId: string
@@ -27,30 +36,22 @@ export default function SchemaEditor({ projectId }: Props) {
   const [saving, setSaving] = useState(false)
   const [executing, setExecuting] = useState(false)
 
-  const [projectStatus, setProjectStatus] = useState("")
-  const [currentSchema, setCurrentSchema] =
-    useState<ProjectSchema | null>(null)
-
+  const [schema, setSchema] = useState<ProjectSchema | null>(null)
   const [ddl, setDDL] = useState("")
-  const [isEditingDraft, setIsEditingDraft] = useState(false)
+  const [caps, setCaps] = useState<SchemaCapabilities | null>(null)
 
   /* ---------------------------------- */
-  /* Load current schema + project      */
+  /* Load state                         */
   /* ---------------------------------- */
   async function refresh() {
-    const status = await FetchProjectStatus(projectId)
-    setProjectStatus(status)
+    const [schemaRes, capsRes] = await Promise.all([
+      GetCurrentSchema(projectId).catch(() => null),
+      GetSchemaCapabilities(projectId),
+    ])
 
-    try {
-      const schema = await GetCurrentSchema(projectId)
-      setCurrentSchema(schema)
-      setDDL(schema.ddl_sql ?? "")
-      setIsEditingDraft(schema.state === "draft")
-    } catch {
-      setCurrentSchema(null)
-      setDDL("")
-      setIsEditingDraft(true)
-    }
+    setSchema(schemaRes)
+    setCaps(capsRes)
+    setDDL(schemaRes?.ddl_sql ?? "")
   }
 
   useEffect(() => {
@@ -58,33 +59,17 @@ export default function SchemaEditor({ projectId }: Props) {
   }, [projectId])
 
   /* ---------------------------------- */
-  /* Derived state                      */
-  /* ---------------------------------- */
-  const isProjectActive = projectStatus === "active"
-  const schemaState = currentSchema?.state
-
-  const isDraft = schemaState === "draft"
-  const isPending = schemaState === "pending"
-  const isApplying = schemaState === "applying"
-  const isApplied = schemaState === "applied"
-  const isFailed = schemaState === "failed"
-
-  const canEditDDL =
-    isEditingDraft &&
-    !isPending &&
-    !isApplying &&
-    !isApplied
-
-  const canCommit = !isProjectActive && isDraft
-  const canExecute = isProjectActive && (isPending || isFailed)
-
-  /* ---------------------------------- */
   /* Actions                            */
   /* ---------------------------------- */
-  function handleStartNewDraft() {
-    setDDL("")
-    setCurrentSchema(null)
-    setIsEditingDraft(true)
+
+  async function handleCreateDraft() {
+    setSaving(true)
+    try {
+      await CreateSchemaDraft(projectId, "")
+      await refresh()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function handleSaveDraft() {
@@ -94,18 +79,17 @@ export default function SchemaEditor({ projectId }: Props) {
     try {
       await CreateSchemaDraft(projectId, ddl)
       await refresh()
-      setIsEditingDraft(false)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleCommit() {
-    if (!currentSchema || !canCommit) return
+    if (!schema) return
 
     setSaving(true)
     try {
-      await CommitSchemaDraft(projectId, currentSchema.id)
+      await CommitSchemaDraft(projectId, schema.id)
       await refresh()
     } finally {
       setSaving(false)
@@ -113,30 +97,21 @@ export default function SchemaEditor({ projectId }: Props) {
   }
 
   async function handleDiscard() {
-    if (!currentSchema) return
+    if (!schema) return
 
     setSaving(true)
     try {
-      await DeleteSchemaDraft(currentSchema.id)
+      await DeleteSchemaDraft(schema.id)
       await refresh()
-      setIsEditingDraft(false)
     } finally {
       setSaving(false)
     }
   }
 
   async function handleExecute() {
-    if (!canExecute) return
-
     setExecuting(true)
     try {
       await ExecuteProjectSchema(projectId)
-
-      // clear editor after successful execution
-      setDDL("")
-      setCurrentSchema(null)
-      setIsEditingDraft(false)
-
       await refresh()
     } finally {
       setExecuting(false)
@@ -144,8 +119,6 @@ export default function SchemaEditor({ projectId }: Props) {
   }
 
   async function handleRetry() {
-    if (!canExecute) return
-
     setExecuting(true)
     try {
       await RetrySchemaExecution(projectId)
@@ -158,7 +131,8 @@ export default function SchemaEditor({ projectId }: Props) {
   /* ---------------------------------- */
   /* Render                             */
   /* ---------------------------------- */
-  if (loading) {
+
+  if (loading || !caps) {
     return (
       <div className="text-sm text-muted-foreground">
         Loading schema…
@@ -170,9 +144,7 @@ export default function SchemaEditor({ projectId }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Schema DDL</CardTitle>
-        {currentSchema && (
-          <Badge variant="outline">{schemaState}</Badge>
-        )}
+        {schema && <Badge variant="outline">{schema.state}</Badge>}
       </CardHeader>
 
       <CardContent className="space-y-4">
@@ -180,25 +152,28 @@ export default function SchemaEditor({ projectId }: Props) {
           value={ddl}
           onChange={(e) => setDDL(e.target.value)}
           className="min-h-[220px] font-mono"
-          disabled={!canEditDDL}
+          disabled={!caps.can_edit_draft}
         />
 
-        {isProjectActive && (
-          <div className="text-sm text-yellow-600">
-            Project is active. Schema commit is disabled.
+        {caps.reason && (
+          <div className="text-sm text-muted-foreground">
+            {caps.reason}
           </div>
         )}
 
         <div className="flex flex-wrap gap-2">
-          {/* Create new draft */}
-          {isApplied && !isEditingDraft && (
-            <Button onClick={handleStartNewDraft}>
+          {/* Create Draft */}
+          {caps.can_create_draft && (
+            <Button
+              onClick={handleCreateDraft}
+              disabled={saving}
+            >
               Create New Draft
             </Button>
           )}
 
-          {/* Save draft */}
-          {isEditingDraft && !isDraft && (
+          {/* Save Draft */}
+          {caps.can_edit_draft && (
             <Button
               onClick={handleSaveDraft}
               disabled={!ddl.trim() || saving}
@@ -207,35 +182,39 @@ export default function SchemaEditor({ projectId }: Props) {
             </Button>
           )}
 
-          {/* Draft actions */}
-          {isDraft && (
-            <>
-              <Button
-                onClick={handleCommit}
-                disabled={saving || !canCommit}
-              >
-                Commit Schema
-              </Button>
+          {/* Commit */}
+          {caps.can_commit && (
+            <Button
+              onClick={handleCommit}
+              disabled={saving}
+            >
+              Commit Schema
+            </Button>
+          )}
 
-              <Button
-                variant="outline"
-                onClick={handleDiscard}
-                disabled={saving}
-              >
-                Discard Draft
-              </Button>
-            </>
+          {/* Discard */}
+          {caps.can_edit_draft && schema && (
+            <Button
+              variant="outline"
+              onClick={handleDiscard}
+              disabled={saving}
+            >
+              Discard Draft
+            </Button>
           )}
 
           {/* Execute */}
-          {canExecute && isPending && (
-            <Button onClick={handleExecute} disabled={executing}>
+          {caps.can_execute && (
+            <Button
+              onClick={handleExecute}
+              disabled={executing}
+            >
               {executing ? "Executing…" : "Execute Schema"}
             </Button>
           )}
 
           {/* Retry */}
-          {canExecute && isFailed && (
+          {caps.can_retry && (
             <Button
               variant="outline"
               onClick={handleRetry}
@@ -246,22 +225,22 @@ export default function SchemaEditor({ projectId }: Props) {
           )}
         </div>
 
-        {isApplying && (
+        {schema?.state === "applying" && (
           <div className="text-sm text-muted-foreground">
             Schema execution in progress…
           </div>
         )}
 
-        {isFailed && (
+        {schema?.state === "failed" && (
           <div className="text-sm text-red-600">
             Execution failed:{" "}
-            {currentSchema?.error_message ?? "Unknown error"}
+            {schema.error_message ?? "Unknown error"}
           </div>
         )}
 
-        {isApplied && !isEditingDraft && (
+        {schema?.state === "applied" && (
           <div className="text-sm text-green-600">
-            Schema applied successfully. Create a new draft to continue.
+            Schema applied successfully.
           </div>
         )}
       </CardContent>

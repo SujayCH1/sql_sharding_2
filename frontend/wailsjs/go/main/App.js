@@ -98,6 +98,10 @@ export function GetProjectSchemaStatus(arg1) {
   return window['go']['main']['App']['GetProjectSchemaStatus'](arg1);
 }
 
+export function GetSchemaCapabilities(arg1) {
+  return window['go']['main']['App']['GetSchemaCapabilities'](arg1);
+}
+
 export function GetSchemaExecutionStatus(arg1) {
   return window['go']['main']['App']['GetSchemaExecutionStatus'](arg1);
 }

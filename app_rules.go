@@ -7,6 +7,15 @@ import (
 	"strings"
 )
 
+type SchemaCapabilities struct {
+	CanCreateDraft bool   `json:"can_create_draft"`
+	CanEditDraft   bool   `json:"can_edit_draft"`
+	CanCommit      bool   `json:"can_commit"`
+	CanExecute     bool   `json:"can_execute"`
+	CanRetry       bool   `json:"can_retry"`
+	Reason         string `json:"reason,omitempty"`
+}
+
 // PROJECT ACTIVATION CONDITION ----------------------------------------
 
 // to see if there are any other active projects before shard activation
