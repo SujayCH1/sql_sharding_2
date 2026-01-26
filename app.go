@@ -172,10 +172,11 @@ func (a *App) ListProjects() ([]repository.Project, error) {
 
 	if err != nil {
 		logger.Logger.Error("Error while fetching projects", "error", err)
+		a.emitter.Error("Projects listing failed", "application - ListProjects", map[string]string{
+			"error": err.Error(),
+		})
 		return nil, err
 	}
-
-	logger.Logger.Info("Sucessfully fetched all projects")
 
 	return result, nil
 }
@@ -185,11 +186,18 @@ func (a *App) DeleteProject(id string) error {
 
 	err := a.ProjectRepo.ProjectRemove(a.ctx, id)
 	if err != nil {
-		logger.Logger.Error("Error while deleting project: ", "error", err)
+		logger.Logger.Error("Error while deleting project: ", "project _ id", id, "error", err)
+		a.emitter.Error("Project deletion failed", "application - DeleteProject", map[string]string{
+			"project_id": id,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("Successfully deleted project", "project_id", id)
+	a.emitter.Info("Project deletion failed", "application - DeleteProject", map[string]string{
+		"project_id": id,
+	})
 
 	return nil
 }
@@ -199,11 +207,13 @@ func (a *App) FetchProjectByID(id string) (repository.Project, error) {
 
 	result, err := a.ProjectRepo.GetProjectByID(a.ctx, id)
 	if err != nil {
-		logger.Logger.Error("Error while fetching project", "error", err)
+		logger.Logger.Error("Error while fetching project", "project_id", id, "error", err)
+		a.emitter.Error("Project fetching failed", "application - FetchProjectByID", map[string]string{
+			"project_id": id,
+			"error":      err.Error(),
+		})
 		return repository.Project{}, err
 	}
-
-	logger.Logger.Info("Successfully fetched project", "project_name", result.Name, "project_id", result.ID)
 
 	return result, err
 }
@@ -213,11 +223,19 @@ func (a *App) AddShard(projectID string) (*repository.Shard, error) {
 
 	result, err := a.ShardRepo.ShardAdd(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to add shard", "error", err)
+		logger.Logger.Error("Failed to add shard", "project_id", projectID, "error", err)
+		a.emitter.Error("Shard addition failed", "application - AddShard", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
 
 	logger.Logger.Info("Successfully created shard", "shard_id", result.ID)
+	a.emitter.Info("Shard addition successful", "application - AddShard", map[string]string{
+		"project_id": projectID,
+		"shard_id":   result.ID,
+	})
 
 	return result, nil
 }
@@ -227,22 +245,26 @@ func (a *App) ListShards(projectID string) ([]repository.Shard, error) {
 
 	result, err := a.ShardRepo.ShardList(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to list shards", "error", err)
+		logger.Logger.Error("Failed to list shards", "project_id", projectID, "error", err)
+		a.emitter.Error("Shard listing failed", "application - ListShards", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
-
-	logger.Logger.Info("Successfully fetched all shards")
 
 	return result, nil
 }
 
 // shard repository - Call to deactivate a shard
-func (a *App) DeactivateShard(
-	shardID string,
-) error {
+func (a *App) DeactivateShard(shardID string) error {
 
 	if err := a.ShardRepo.ShardDeactivate(a.ctx, shardID); err != nil {
-		logger.Logger.Error("Failed to deactivate shard", "error", err)
+		logger.Logger.Error("Failed to deactivate shard", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard deactivation failed", "application - ShardDeactivate", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 		return err
 	}
 
@@ -250,7 +272,11 @@ func (a *App) DeactivateShard(
 
 	shards, err := a.ListShards(projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch shard status", "error", err)
+		a.emitter.Error("Project fetching failed for automated project deactivation", "application - ShardDeactivate", map[string]string{
+			"project_id": projectID,
+			"shard_id":   shardID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
@@ -258,7 +284,12 @@ func (a *App) DeactivateShard(
 		if shard.Status == "inactive" {
 
 			if err := a.ProjectRepo.ProjectDeactivate(a.ctx, projectID); err != nil {
-				logger.Logger.Error("Failed to deactivate project", "error", err)
+				logger.Logger.Error("Failed to deactivate project for automated project deactivation", "project_id", projectID, "shard_id", shardID, "error", err)
+				a.emitter.Error("Failed to deactivate project for automated project deactivation", "application - ShardDeactivate", map[string]string{
+					"project_id": projectID,
+					"shard_id":   shardID,
+					"error":      err.Error(),
+				})
 				return err
 			}
 
@@ -271,11 +302,16 @@ func (a *App) DeactivateShard(
 		}
 	}
 
-	logger.Logger.Info(
-		"Successfully deactivated shard",
-		"shard_id", shardID,
-		"project_id", projectID,
-	)
+	logger.Logger.Info("Automatic project deactivation successful", "project_Id", projectID)
+	a.emitter.Info("Automated project deactivation successful", "application - DeactivateProject", map[string]string{
+		"project_id": projectID,
+	})
+
+	logger.Logger.Info("Successfully deactivated shard", "shard_id", shardID, "project_id", projectID)
+	a.emitter.Info("Shard deactivation successful", "application - DeactivateProject", map[string]string{
+		"project_id": projectID,
+		"shardd_id":  shardID,
+	})
 
 	return nil
 }
@@ -285,11 +321,18 @@ func (a *App) DeleteAllShards(projectID string) error {
 
 	err := a.ShardRepo.ShardDeleteAll(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete shards for project", "error", err)
+		logger.Logger.Error("Failed to delete shards for project", "project_id", projectID, "error", err)
+		a.emitter.Error("Shards deletion failed", "application - DeleteAllShards", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
-	logger.Logger.Info("Successfully deleted all shards")
+	logger.Logger.Info("Successfully deleted all shards", "project_id", projectID)
+	a.emitter.Info("Shards deletion successful", "application - DeleteAllShards", map[string]string{
+		"project_id": projectID,
+	})
 
 	return nil
 }
@@ -299,26 +342,47 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 
 	isInactive, err := a.checkIfShardInactive(shardID)
 	if err != nil {
+		a.emitter.Error("Shard deletion failed", "application - DeleteShard", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 		return "", err
 	}
 
 	if !isInactive {
+		a.emitter.Error("Shard deletion failed", "application - DeleteShard", map[string]string{
+			"shard_id": shardID,
+			"error":    "cannot delete active shard",
+		})
 		return "CANNOT_DELETE_ACTIVE_SHARD", nil
 	}
 
 	err = a.DeleteConnection(shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete shard connection", "error", err)
+		logger.Logger.Error("Failed to delete shard connection", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard deletion failed", "application - DeleteShard", map[string]string{
+			"shard_id": shardID,
+			"error":    "failed to delete shard connection",
+		})
 		return "", err
 	}
 
 	err = a.ShardRepo.ShardDelete(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete shard", "error", err)
+		logger.Logger.Error("Failed to delete shard", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard deletion failed", "application - DeleteShard", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 		return "", err
 	}
 
 	logger.Logger.Info("Successfully deleted shard", "shard_id", shardID)
+	a.emitter.Info("Shard deletion successful", "application - DeleteShard", map[string]string{
+		"shard_id": shardID,
+		"error":    err.Error(),
+	})
+
 	return "DELETED", nil
 }
 
@@ -327,33 +391,60 @@ func (a *App) ActivateShard(shardID string) error {
 
 	err := a.RetryShardConnections(a.ctx)
 	if err != nil {
-		logger.Logger.Error("Failed to activate shard", "Retry mechanism", err)
+		logger.Logger.Error("Failed to activate shard", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard Activation failed", "application - ActivateShard", map[string]string{
+			"shard_id": shardID,
+			"error":    "retry mechanism failed",
+		})
 	}
 
 	projectID, err := a.ShardRepo.FetchProjectID(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to activate shard", "error", err)
+		logger.Logger.Error("Failed to activate shard", "shard_id", shardID, "error", err)
+		logger.Logger.Error("Failed to activate shard", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard Activation failed", "application - ActivateShard", map[string]string{
+			"shard_id": shardID,
+			"error":    "project fetching failed for health checking",
+		})
 		return err
 	}
 
 	isConnected, err := a.checkShardHealth(a.ctx, projectID, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to activate shard", "error", err, "projectid", projectID)
+		logger.Logger.Error("Failed to activate shard", "projectid", projectID, "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard Activation failed", "application - ActivateShard", map[string]string{
+			"project_id": projectID,
+			"shard_id":   shardID,
+			"error":      "failed for checking shard health",
+		})
 		return err
 	}
 
 	if !isConnected {
-		logger.Logger.Error("Failed to activate shard", "error", "shard connection not available")
+		logger.Logger.Error("Failed to activate shard", "shard_id", shardID, "error", "shard connection not available")
+		a.emitter.Error("Shard Activation failed", "application - ActivateShard", map[string]string{
+			"project_id": projectID,
+			"shard_id":   shardID,
+			"error":      "shard connection failed",
+		})
 		return err
 	}
 
 	err = a.ShardRepo.ShardActivate(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to activate shard", "error", err)
+		logger.Logger.Error("Failed to activate shard", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard Activation failed", "application - ActivateShard", map[string]string{
+			"project_id": projectID,
+			"shard_id":   shardID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("Successfully activated shard", "shard_id", shardID)
+	a.emitter.Info("Shard activation successfull", "application - ActivateShard", map[string]string{
+		"shard_id": shardID,
+	})
 
 	return nil
 }
@@ -363,11 +454,13 @@ func (a *App) FetchShardStatus(shardID string) (string, error) {
 
 	status, err := a.ShardRepo.FetchShardStatus(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch shard shard", "error", err)
+		logger.Logger.Error("Failed to fetch shard shard", "shard_Id", shardID, "error", err)
+		a.emitter.Error("Shard status fetching failed", "application - FetchShardStatus", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 		return "", err
 	}
-
-	logger.Logger.Info("Successfully fetched shard status", "shard_id", shardID)
 
 	return status, nil
 }
@@ -377,11 +470,18 @@ func (a *App) AddConnection(connectionInfo *repository.ShardConnection) error {
 
 	err := a.ShardConnectionRepo.ConnectionCreate(a.ctx, connectionInfo)
 	if err != nil {
-		logger.Logger.Error("Failed to add shard connection details", "error", err)
+		logger.Logger.Error("Failed to add shard connection details", "shard_id", connectionInfo.ShardID, "error", err)
+		a.emitter.Error("shard connection addition failed", "application - AddConnection", map[string]string{
+			"shard_id": connectionInfo.ShardID,
+			"error":    err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("Successfully added shard connection details", "shard_id", connectionInfo.ShardID)
+	a.emitter.Info("shard connection addition successfull", "application - AddConnection", map[string]string{
+		"shard_id": connectionInfo.ShardID,
+	})
 
 	return nil
 }
@@ -391,10 +491,17 @@ func (a *App) DeleteConnection(shardID string) error {
 
 	err := a.ShardConnectionRepo.ConnectionRemove(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to remove shard connection details", "error", err)
+		logger.Logger.Error("Failed to remove shard connection details", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard connection deletion failed", "application - DeleteConnection", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 	}
 
 	logger.Logger.Info("Successfully deleted shard connection details", "shard_id", shardID)
+	a.emitter.Info("Shard connection deletion successfull", "application - DeleteConnection", map[string]string{
+		"shard_id": shardID,
+	})
 
 	return nil
 }
@@ -404,11 +511,13 @@ func (a *App) FetchConnectionInfo(shardID string) (repository.ShardConnection, e
 
 	conn, err := a.ShardConnectionRepo.FetchConnectionByShardID(a.ctx, shardID)
 	if err != nil {
-		logger.Logger.Error("Failed to fecth sahrd connection infomation", "error", err)
+		logger.Logger.Error("Failed to fecth sahrd connection infomation", "shard_id", shardID, "error", err)
+		a.emitter.Error("Shard connection info fetching failed", "application - FetchConnectionInfo", map[string]string{
+			"shard_id": shardID,
+			"error":    err.Error(),
+		})
 		return repository.ShardConnection{}, err
 	}
-
-	logger.Logger.Info("Successfully fetched shard connection details", "shard_id", shardID)
 
 	return conn, nil
 }
@@ -418,11 +527,18 @@ func (a *App) UpdateConnection(connInfo repository.ShardConnection) error {
 
 	err := a.ShardConnectionRepo.ConnectionUpdate(a.ctx, connInfo)
 	if err != nil {
-		logger.Logger.Error("Failed to update shard connection details", "error", err)
+		logger.Logger.Error("Failed to update shard connection details", "shard_id", connInfo.ShardID, "error", err)
+		a.emitter.Error("Shard connection updation failed", "application - UpdateConnection", map[string]string{
+			"shard_id": connInfo.ShardID,
+			"error":    err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("Successfully updated shard connection details", "shard_id", connInfo.ShardID)
+	a.emitter.Info("Shard connection updation successfull", "application - UpdateConnection", map[string]string{
+		"shard_id": connInfo.ShardID,
+	})
 
 	return nil
 }
@@ -432,37 +548,58 @@ func (a *App) Activateproject(projectID string) error {
 
 	otherProjectsInactive, err := a.checkAllProjectsInactive()
 	if err != nil {
-		logger.Logger.Error("Failed to check status of projects for projct activation", "error", err)
+		logger.Logger.Error("Failed to check status of projects for projct activation", "project_id", projectID, "error", err)
+		a.emitter.Error("Project activation failed", "application - Activateproject", map[string]string{
+			"project_id": projectID,
+			"error":      "unable to fetch projects for activation constratints",
+		})
 		return err
 	}
 
 	if otherProjectsInactive == false {
-		logger.Logger.Error("Failed to activate project", "error", "another project is already active")
+		logger.Logger.Error("Failed to activate project", "error", "project_id", projectID, "another project is already active")
+		a.emitter.Error("Project activation failed", "application - Activateproject", map[string]string{
+			"project_id": projectID,
+			"error":      "another project is already active",
+		})
 		return errors.New("another project is already active")
 	}
 
 	allShardsNotActive, err := a.checkAllShardsActive(projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to check status of projects for projct activation", "error", err)
+		logger.Logger.Error("Failed to check status of projects for projct activation", "project_id", projectID, "error", err)
+		a.emitter.Error("Project activation failed", "application - Activateproject", map[string]string{
+			"project_id": projectID,
+			"error":      "all project shards are not active",
+		})
 		return err
 	}
 
 	if allShardsNotActive == false {
-		logger.Logger.Error("Failed to activate project", "error", "All shards are not active")
+		logger.Logger.Error("Failed to activate project", "error", "project_id", projectID, "All shards are not active")
+		a.emitter.Error("Project activation failed", "application - Activateproject", map[string]string{
+			"project_id": projectID,
+			"error":      "another project is already active",
+		})
 		return errors.New("All shards are not active")
 	}
 
 	err = a.ProjectRepo.ProjectActivate(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to activate project", "error", err)
+		logger.Logger.Error("Failed to activate project", "project_id", projectID, "error", err)
+		a.emitter.Error("Project activation failed", "application - Activateproject", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
-
-	logger.Logger.Info("Initiating shard connection for active projects")
 
 	err = a.ShardConnectionManager.InititateConnectionsAll(a.ctx)
 
 	logger.Logger.Info("Successfully activated the project", "project_id", projectID)
+	a.emitter.Info("Project activation successfull", "application - Activateproject", map[string]string{
+		"project_id": projectID,
+	})
 
 	return nil
 }
@@ -472,10 +609,17 @@ func (a *App) Deactivateproject(projectID string) error {
 
 	err := a.ProjectRepo.ProjectDeactivate(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to deactivate project", "error", err)
+		logger.Logger.Error("Failed to deactivate project", "project_id", projectID, "error", err)
+		a.emitter.Error("Project deletion failed", "application - Deactivateproject", map[string]string{
+			"project_Id": projectID,
+			"error":      err.Error(),
+		})
 	}
 
 	logger.Logger.Info("Successfully deactivated the project", "project_id", projectID)
+	a.emitter.Info("Project deletion successfull", "application - Deactivateproject", map[string]string{
+		"project_Id": projectID,
+	})
 
 	return nil
 }
@@ -485,11 +629,14 @@ func (a *App) FetchProjectStatus(projectID string) (string, error) {
 
 	status, err := a.ProjectRepo.FetchProjectStatus(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch project status", "error", err)
+		logger.Logger.Error("Failed to fetch project status", "project_id", projectID, "error", err)
+		a.emitter.Error("Project status fetching failed", "application - FetchProjectStatus", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return "", err
 	}
 
-	logger.Logger.Info("Succesfully fetched status of project", "project_id", projectID)
 	return status, nil
 
 }
@@ -499,11 +646,18 @@ func (a *App) CreateSchemaDraft(projectID string, ddlSQL string) (*repository.Pr
 
 	schema, err := a.ProjectSchemaRepo.ProjectSchemaCreateDraft(a.ctx, projectID, ddlSQL)
 	if err != nil {
-		logger.Logger.Error("Failed to create schema draft", "error", err)
+		logger.Logger.Error("Failed to create schema draft", "project_id", projectID, "error", err)
+		a.emitter.Error("Schema draft creation failed", "application - CreateSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
 
 	logger.Logger.Info("Succesfully created schema draft of project", "project_id", projectID)
+	a.emitter.Info("Schema draft creation successfull", "application - CreateSchemaDraft", map[string]string{
+		"project_id": projectID,
+	})
 	return schema, nil
 
 }
@@ -513,87 +667,112 @@ func (a *App) CommitSchemaDraft(projectID string, schemaID string) error {
 
 	ok, err := a.checkIfProjectInactive(projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch project status", "error", err)
+		logger.Logger.Error("Failed to fetch project status", "project_id", projectID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "failed to check project status",
+		})
 		return err
 	}
+
 	if !ok {
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "project is active",
+		})
 		return errors.New("project must be inactive to modify schema")
 	}
 
-	// ok, err = a.checkAllShardsActive(projectID)
-	// if !ok {
-	// 	return errors.New("project shards and not active")
-	// }
-
 	ok, err = a.checkIfSchemaDraft(schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch schema state", "error", err)
+		logger.Logger.Error("Failed to fetch schema state", "project_id", projectID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "failed to fetch schema state",
+		})
 		return err
 	}
 	if !ok {
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "schema should be in draft before commit",
+		})
 		return errors.New("schema must be in draft state to commit")
 	}
 
 	inFlight, err := a.checkIfSchemaInFlight(projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to check schema in-flight status", "error", err)
+		logger.Logger.Error("Failed to check schema in-flight status", "project_id", projectID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "failed to check schema in-flight status",
+		})
 		return err
 	}
 	if inFlight {
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "another schema change is already in progress",
+		})
 		return errors.New("another schema change is already in progress")
 	}
 
 	projectSchema, err := a.ProjectSchemaRepo.ProjectSchemaFetchBySchemaID(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch schema by id", "error", err)
+		logger.Logger.Error("Failed to fetch schema by id", "project_id", projectID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "failed to fetch schema infomation",
+		})
 		return err
 	}
-
-	// if !a.checkIfOnlyDDL(projectSchema.DDL_SQL) {
-	// 	return errors.New("only DDL statements are allowed in schema changes")
-	// }
 
 	destructive, err := a.checkIfDDLDestructive(projectID, projectSchema.DDL_SQL)
 	if err != nil {
-		logger.Logger.Error("Failed to validate destructive DDL", "error", err)
+		logger.Logger.Error("Failed to validate destructive DDL", "project_id", projectID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "failed to validate destructive DDL",
+		})
 		return err
 	}
 	if destructive {
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "destructive ddl in query",
+		})
 		return errors.New("destructive DDL is not allowed after initial schema")
 	}
 
-	logger.Logger.Info(
-		"Applying committed schema to metadata",
-		"project_id", projectID,
-		"schema_id", schemaID,
-	)
+	logger.Logger.Info("Applying committed schema to metadata", "project_id", projectID, "schema_id", schemaID)
+	a.emitter.Info("applying committed schema to metadata", "application - CommitSchemaDraft", map[string]string{
+		"project_id": projectID,
+	})
 
-	err = a.SchemaService.ApplyDDLAndRecomputeShardKeys(
-		a.ctx,
-		projectID,
-		projectSchema.DDL_SQL,
-	)
+	err = a.SchemaService.ApplyDDLAndRecomputeShardKeys(a.ctx, projectID, projectSchema.DDL_SQL)
 	if err != nil {
-		logger.Logger.Error(
-			"Failed to apply schema to metadata",
-			"project_id", projectID,
-			"schema_id", schemaID,
-			"error", err,
-		)
+		logger.Logger.Error("Failed to apply schema to metadata", "project_id", projectID, "schema_id", schemaID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "Failed to apply schema to metadata" + err.Error(),
+		})
 		return err
 	}
 
 	err = a.ProjectSchemaRepo.ProjectSchemaCommitDraft(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to commit project schema", "error", err)
+		logger.Logger.Error("Failed to commit project schema", "project_id", projectID, "schema_id", schemaID, "error", err)
+		a.emitter.Error("Draft schema commit failed", "application - CommitSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error:":     "Failed to commit project schema" + err.Error(),
+		})
 		return err
 	}
 
-	logger.Logger.Info(
-		"Successfully committed project schema",
-		"project_id", projectID,
-		"schema_id", schemaID,
-	)
+	logger.Logger.Info("Successfully committed project schema", "project_id", projectID, "schema_id", schemaID)
+	a.emitter.Info("Schema draft commit successfull", "application - CommitSchemaDraft", map[string]string{
+		"project_id": projectID,
+	})
 
 	return nil
 }
@@ -603,11 +782,14 @@ func (a *App) GetCurrentSchema(projectID string) (*repository.ProjectSchema, err
 
 	schema, err := a.ProjectSchemaRepo.ProjectSchemaGetLatest(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch latest schema of project", "error", err)
+		logger.Logger.Error("Failed to fetch latest schema of project", "project_id", projectID, "error", err)
+		a.emitter.Error("Current schema fetching failed", "application - GetCurrentSchema", map[string]string{
+			"projecy_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
 
-	logger.Logger.Info("Successfully fetched latest schema of project")
 	return schema, nil
 
 }
@@ -617,11 +799,14 @@ func (a *App) GetSchemaHistory(projectID string) ([]repository.ProjectSchema, er
 
 	history, err := a.ProjectSchemaRepo.ProjectSchemaFetchHistory(a.ctx, projectID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch project schema history", "error", err)
+		logger.Logger.Error("Failed to fetch project schema history", "project_id", projectID, "error", err)
+		a.emitter.Error("Schema history fetching failed", "application - GetSchemaHistory", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
 
-	logger.Logger.Info("Successfully fetched project schema history")
 	return history, nil
 
 }
@@ -631,11 +816,18 @@ func (a *App) DeleteSchemaDraft(schemaID string) error {
 
 	err := a.ProjectSchemaRepo.ProjectSchemaDeleteDraft(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to delete project schema draft", "error", err)
+		logger.Logger.Error("Failed to delete project schema draft", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Schema deletion failed", "application - DeleteSchemaDraft", map[string]string{
+			"schema_id": schemaID,
+			"error":     err.Error(),
+		})
 		return err
 	}
 
-	logger.Logger.Info("Successfully deleted project schema draft")
+	logger.Logger.Info("Successfully deleted project schema draft", "schema_id", schemaID)
+	a.emitter.Info("Schema deletion successfull", "application - DeleteSchemaDraft", map[string]string{
+		"schema_id": schemaID,
+	})
 	return nil
 
 }
@@ -645,11 +837,14 @@ func (a *App) GetSchemaExecutionStatus(schemaID string) ([]repository.SchemaExec
 
 	statuAll, err := a.SchemaExecutionStatusRepo.ExecutionRecordsFetchStatusAll(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch execution status of all records of schema", "error", err)
+		logger.Logger.Error("Failed to fetch execution status of all records of schema", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Schema execution status fetching failed", "application - GetSchemaExecutionStatus", map[string]string{
+			"schema_id": schemaID,
+			"error":     err.Error(),
+		})
 		return nil, err
 	}
 
-	logger.Logger.Info("Successfully fetched exxecution status of all records of schema")
 	return statuAll, err
 }
 
@@ -658,11 +853,14 @@ func (a *App) GetFailedShardExecutions(schemaID string) ([]repository.SchemaExec
 
 	statuAll, err := a.SchemaExecutionStatusRepo.ExecutionRecordsFetchStatusFailed(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Failed to fetch execution status of all failed records of schema", "error", err)
+		logger.Logger.Error("Failed to fetch execution status of all failed records of schema", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Failed shard execution status fetching failed", "application - GetFailedShardExecutions", map[string]string{
+			"schema_id": schemaID,
+			"error":     err.Error(),
+		})
 		return nil, err
 	}
 
-	logger.Logger.Info("Successfully fetched execution status of all failed records of schema")
 	return statuAll, err
 }
 
@@ -670,11 +868,14 @@ func (a *App) GetFailedShardExecutions(schemaID string) ([]repository.SchemaExec
 func (a *App) GetProjectSchemaStatus(schemaID string) (string, error) {
 	status, err := a.ProjectSchemaRepo.ProjectSchemaGetState(a.ctx, schemaID)
 	if err != nil {
-		logger.Logger.Error("Fialed to fetch status of a schema", "error", err)
+		logger.Logger.Error("Fialed to fetch status of a schema", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Project schema status fetching failed", "application - GetProjectSchemaStatus", map[string]string{
+			"schema_id": schemaID,
+			"error":     err.Error(),
+		})
 		return "", err
 	}
 
-	logger.Logger.Info("Successfully fetched status of schema")
 	return status, nil
 }
 
@@ -683,10 +884,18 @@ func (a *App) ExecuteProjectSchema(projectID string) error {
 
 	caps, err := a.GetSchemaCapabilities(projectID)
 	if err != nil {
+		a.emitter.Error("Project schema execution failed", "application - ExecuteProjectSchema", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
 	if !caps.CanExecute {
+		a.emitter.Error("Project schema execution failed", "application - ExecuteProjectSchema", map[string]string{
+			"project_id": projectID,
+			"error":      "schema execution not allowed",
+		})
 		return errors.New("schema execution not allowed")
 	}
 
@@ -702,8 +911,18 @@ func (a *App) ExecuteProjectSchema(projectID string) error {
 	)
 
 	if err != nil {
+		logger.Logger.Error("failed to execute project schema", "project_id", projectID, "error", err)
+		a.emitter.Error("Project schema execution failed", "application - ExecuteProjectSchema", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
+
+	logger.Logger.Info("Successfully executed projects schema", "project_id", projectID)
+	a.emitter.Info("Project schema execution successfull", "application - ExecuteProjectSchema", map[string]string{
+		"project_id": projectID,
+	})
 
 	return nil
 }
@@ -725,10 +944,17 @@ func (a *App) RecomputeKeys(projectID string) error {
 	err := a.InferenceService.ApplyShardKeyInference(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("shard key inference failed", "project_id", projectID, "error", err)
+		a.emitter.Error("Shard key recomputation failed", "application -RecomputeKeys", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("shard key inference completed successfully", "project_id", projectID)
+	a.emitter.Info("Shard key recomputation successfull	", "application -RecomputeKeys", map[string]string{
+		"project_id": projectID,
+	})
 	return nil
 
 }
@@ -739,10 +965,13 @@ func (a *App) FetchShardKeys(projectID string) ([]repository.ShardKeys, error) {
 	keys, err := a.ShardKeysRepo.FetchShardKeysByProjectID(a.ctx, projectID)
 	if err != nil {
 		logger.Logger.Error("failed to fetch shard keys", "project_id", projectID, "error", err)
+		a.emitter.Error("Shard key fetching failed", "application - FetchShardKeys", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return nil, err
 	}
 
-	logger.Logger.Info("fetched shard keys successfully", "project_id", projectID, "count", len(keys))
 	return keys, nil
 
 }
@@ -752,11 +981,18 @@ func (a *App) ReplaceShardKeys(projectID string, keys []repository.ShardKeyRecor
 
 	err := a.ShardKeysRepo.ReplaceShardKeysForProject(a.ctx, projectID, keys)
 	if err != nil {
-		logger.Logger.Error("filed to replace shard keys", "projectID", projectID)
+		logger.Logger.Error("filed to replace shard keys", "projectID", projectID, "error", err)
+		a.emitter.Error("Shard key replacing failed", "application - ReplaceShardKeys", map[string]string{
+			"project_id": projectID,
+			"error":      err.Error(),
+		})
 		return err
 	}
 
 	logger.Logger.Info("successfully replaced shard keys", "projectID", projectID)
+	a.emitter.Info("Shard key replacing successfull", "application - ReplaceShardKeys", map[string]string{
+		"project_id": projectID,
+	})
 	return nil
 }
 
@@ -769,16 +1005,31 @@ func (a *App) ExecuteSQL(projectID string, sqlText string) ([]executor.Execution
 		sqlText,
 	)
 	if err != nil {
-		logger.Logger.Error("Filed to route and execute query", "error", err)
+		logger.Logger.Error("Filed to route and execute query", "project_id", projectID, "error", err)
+		a.emitter.Error("Query execution failed", "application - ExecuteSQL", map[string]string{
+			"project_id": projectID,
+			"error":      "query router:" + err.Error(),
+		})
 		return nil, err
 	}
 
-	return a.ExecutorService.Execute(
+	result, err := a.ExecutorService.Execute(
 		a.ctx,
 		projectID,
 		sqlText,
 		plan,
 	)
+	if err != nil {
+		logger.Logger.Error("failed to execute query", "project_id", projectID, "error", err)
+		logger.Logger.Error("Filed to route and execute query", "project_id", projectID, "error", err)
+		a.emitter.Error("Query execution failed", "application - ExecuteSQL", map[string]string{
+			"project_id": projectID,
+			"error":      "query executor:" + err.Error(),
+		})
+		return nil, err
+	}
+
+	return result, nil
 }
 
 // func to continuously check  health of shards of projects
@@ -790,6 +1041,7 @@ func (a *App) MonitorShards(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			logger.Logger.Info("Shard monitor stopped")
+			a.emitter.Info("Shard monitor stopper", "application - MonitorShards", map[string]string{})
 			return
 
 		case <-ticker.C:
@@ -803,9 +1055,14 @@ func (a *App) RetryShardConnections(ctx context.Context) error {
 
 	err := a.ShardConnectionManager.InititateConnectionsAll(a.ctx)
 	if err != nil {
+		logger.Logger.Error("shard connection retry mechanism failed", "error", err)
+		a.emitter.Error("Shard connection retry mechanism failed", "application - RetryShardConnections", map[string]string{
+			"error": err.Error(),
+		})
 		return err
 	}
 
+	a.emitter.Info("Shard connection retry mechanism successfull", "application - RetryShardConnections", map[string]string{})
 	return nil
 
 }
