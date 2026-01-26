@@ -1,0 +1,6 @@
+Overriding existing handler for signal 10. Set JSC_SIGNAL_FOR_GC if you want WebKit to use a different signal
+{"time":"2026-01-26T13:25:30.166432953Z","level":"INFO","msg":"Successfully loaded environment variables"}
+{"time":"2026-01-26T13:25:30.184795558Z","level":"INFO","msg":"Successfuly migrated application database"}
+{"time":"2026-01-26T13:25:30.189679249Z","level":"INFO","msg":"Successfully connected to application database"}
+{"time":"2026-01-26T13:25:30.204341813Z","level":"INFO","msg":"Sucessfully initiated shard connections for all project"}
+{"time":"2026-01-26T13:25:30.204560193Z","level":"INFO","msg":"HTTP server started","addr":":8080"}
