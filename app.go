@@ -20,7 +20,8 @@ import (
 
 // App struct
 type App struct {
-	ctx context.Context
+	ctx     context.Context
+	emitter *logger.LogEmitter
 
 	// http
 	httpServer *http.Server
@@ -58,6 +59,7 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.emitter = logger.NewLogEmitter(ctx)
 
 	err := loader.LoadServices(ctx)
 	if err != nil {
@@ -146,13 +148,19 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) CreateProject(name string, description string) (*repository.Project, error) {
 
 	result, err := a.ProjectRepo.ProjectAdd(a.ctx, name, description)
-
 	if err != nil {
-		logger.Logger.Error("Error while creating project", "error", err)
+		logger.Logger.Error("Error while creating project", "project_name", name, "error", err)
+		a.emitter.Error("Project creation failed", "application - CreateProject", map[string]string{
+			"project_name": name,
+			"error":        err.Error(),
+		})
 		return nil, err
 	}
 
 	logger.Logger.Info("Successfully created project", "project_name", name)
+	a.emitter.Info("project creation successful", "application - CreateProject", map[string]string{
+		"project_name": name,
+	})
 
 	return result, nil
 }
@@ -753,10 +761,7 @@ func (a *App) ReplaceShardKeys(projectID string, keys []repository.ShardKeyRecor
 }
 
 // func to execute DML quereis on repective schema
-func (a *App) ExecuteSQL(
-	projectID string,
-	sqlText string,
-) ([]executor.ExecutionResult, error) {
+func (a *App) ExecuteSQL(projectID string, sqlText string) ([]executor.ExecutionResult, error) {
 
 	plan, err := a.RouterService.RouteSQL(
 		a.ctx,
@@ -854,11 +859,7 @@ func (a *App) GetSchemaCapabilities(projectID string) (*SchemaCapabilities, erro
 }
 
 // helper to pass repos to DDL executor
-func (a *App) execDDLonShard(
-	projectID string,
-	shardID string,
-	ddl string,
-) error {
+func (a *App) execDDLonShard(projectID string, shardID string, ddl string) error {
 
 	db, err := a.ShardConnectionStore.Get(projectID, shardID)
 	if err != nil {
