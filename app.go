@@ -1115,6 +1115,63 @@ func (a *App) GetSchemaCapabilities(projectID string) (*SchemaCapabilities, erro
 	return caps, nil
 }
 
+// project schema repository - update existing schema draft
+func (a *App) UpdateProjectSchemaDraft(projectID string, schemaID string, ddlSQL string) error {
+
+	ok, err := a.checkIfProjectInactive(projectID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch project status", "project_id", projectID, "error", err)
+		a.emitter.Error("Schema draft update failed", "application - UpdateProjectSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error":      "failed to check project status",
+		})
+		return err
+	}
+
+	if !ok {
+		a.emitter.Error("Schema draft update failed", "application - UpdateProjectSchemaDraft", map[string]string{
+			"project_id": projectID,
+			"error":      "project is active",
+		})
+		return errors.New("project must be inactive to modify schema")
+	}
+
+	ok, err = a.checkIfSchemaDraft(schemaID)
+	if err != nil {
+		logger.Logger.Error("Failed to fetch schema state", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Schema draft update failed", "application - UpdateProjectSchemaDraft", map[string]string{
+			"schema_id": schemaID,
+			"error":     "failed to fetch schema state",
+		})
+		return err
+	}
+
+	if !ok {
+		a.emitter.Error("Schema draft update failed", "application - UpdateProjectSchemaDraft", map[string]string{
+			"schema_id": schemaID,
+			"error":     "schema is not in draft state",
+		})
+		return errors.New("only draft schemas can be updated")
+	}
+
+	err = a.ProjectSchemaRepo.ProjectSchemaUpdateDraft(a.ctx, schemaID, ddlSQL)
+	if err != nil {
+		logger.Logger.Error("Failed to update schema draft", "schema_id", schemaID, "error", err)
+		a.emitter.Error("Schema draft update failed", "application - UpdateProjectSchemaDraft", map[string]string{
+			"schema_id": schemaID,
+			"error":     err.Error(),
+		})
+		return err
+	}
+
+	logger.Logger.Info("Successfully updated schema draft", "schema_id", schemaID)
+	a.emitter.Info("Schema draft updated successfully", "application - UpdateProjectSchemaDraft", map[string]string{
+		"schema_id": schemaID,
+	})
+
+	return nil
+}
+
 // helper to pass repos to DDL executor
 func (a *App) execDDLonShard(projectID string, shardID string, ddl string) error {
 

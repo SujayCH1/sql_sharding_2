@@ -169,6 +169,7 @@ func (p *ProjectSchemaRepository) ProjectSchemaFetchHistory(ctx context.Context,
 			error_message, created_at, committed_at, applied_at
 		FROM project_schemas
 		WHERE project_id = $1
+		  AND state != 'draft'
 		ORDER BY version ASC
 	`
 
@@ -440,6 +441,36 @@ func (p *ProjectSchemaRepository) fetchProjectSchemaVersions(ctx context.Context
 
 	return versions, nil
 
+}
+
+// update existing draft ddl (NO new row, NO version change)
+func (p *ProjectSchemaRepository) ProjectSchemaUpdateDraft(ctx context.Context, schemaID string, ddlSQL string) error {
+
+	query := `
+		UPDATE project_schemas
+		SET ddl_sql = $1
+		WHERE id = $2 AND state = 'draft'
+	`
+
+	result, err := p.projSchm.ExecContext(
+		ctx,
+		query,
+		ddlSQL,
+		schemaID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return sql.ErrNoRows
+	}
+
+	return nil
 }
 
 // helper to decide coorect version fo schema

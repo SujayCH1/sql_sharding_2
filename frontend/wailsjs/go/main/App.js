@@ -141,3 +141,7 @@ export function RetryShardConnections(arg1) {
 export function UpdateConnection(arg1) {
   return window['go']['main']['App']['UpdateConnection'](arg1);
 }
+
+export function UpdateProjectSchemaDraft(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateProjectSchemaDraft'](arg1, arg2, arg3);
+}

@@ -12,6 +12,7 @@ import {
   ExecuteProjectSchema,
   RetrySchemaExecution,
   GetSchemaCapabilities,
+  UpdateProjectSchemaDraft,
 } from "../../../../wailsjs/go/main/App"
 
 import type { repository } from "../../../../wailsjs/go/models"
@@ -72,17 +73,18 @@ export default function SchemaEditor({ projectId }: Props) {
     }
   }
 
-  async function handleSaveDraft() {
-    if (!ddl.trim()) return
+async function handleSaveDraft() {
+  if (!ddl.trim() || !schema) return
 
-    setSaving(true)
-    try {
-      await CreateSchemaDraft(projectId, ddl)
-      await refresh()
-    } finally {
-      setSaving(false)
-    }
+  setSaving(true)
+  try {
+    await UpdateProjectSchemaDraft(projectId, schema.id, ddl) 
+    await refresh()
+  } finally {
+    setSaving(false)
   }
+}
+
 
   async function handleCommit() {
     if (!schema) return
