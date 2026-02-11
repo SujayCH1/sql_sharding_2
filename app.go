@@ -380,7 +380,7 @@ func (a *App) DeleteShard(shardID string) (string, error) {
 	logger.Logger.Info("Successfully deleted shard", "shard_id", shardID)
 	a.emitter.Info("Shard deletion successful", "application - DeleteShard", map[string]string{
 		"shard_id": shardID,
-		"error":    err.Error(),
+		// "error":    err.Error(), (never forget the pain this caused)
 	})
 
 	return "DELETED", nil
