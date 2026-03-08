@@ -60,6 +60,24 @@ func (p *Planner) Plan(
 		}
 	}
 
+	// scatter gather optimization
+	if len(pred.Values) >= p.ring.Size() && len(shards) > 1 {
+
+		targets := make([]ShardTarget, 0, p.ring.Size())
+
+		for _, sid := range p.ring.shards {
+			targets = append(targets, ShardTarget{
+				ShardID: sid,
+			})
+		}
+
+		return &RoutingPlan{
+			Mode:    RoutingModeBroadcast,
+			Targets: targets,
+			Reason:  "scatter-gather selected due to large multi-key fanout",
+		}
+	}
+
 	// 4. Enforce fanout limits
 	if len(shards) > 1 && len(shards) > p.cfg.MaxShardFanout {
 		return &RoutingPlan{
