@@ -245,7 +245,7 @@ func (r *SchemaExecutionStatusRepository) ExecutionStatusFetchStatusByShardID(
 		SELECT
 			id, schema_id, shard_id, state, error_messgae, executed_at
 		FROM schema_execution_status
-		WHERE shard_id = $!
+		WHERE shard_id = $1
 	`
 
 	rows, err := r.schmExeSt.QueryContext(
