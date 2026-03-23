@@ -49,14 +49,17 @@ func (s *RouterService) RouteSQL(
 	}
 
 	rawStmt := parseResult.Stmts[0]
+	node := rawStmt.Stmt
 
-	// 2. Extract table + AST node
-	tableName, node, err := extractTableAndNode(rawStmt)
-	if err != nil {
-		return nil, err
+	// detect joins
+	var joinInfo *JoinInfo
+	var isJoin bool
+
+	if selectNode, ok := node.Node.(*pg_query.Node_SelectStmt); ok {
+		joinInfo, isJoin = ExtractJoinInfo(selectNode.SelectStmt)
 	}
 
-	// 3. Fetch shard keys for project
+	// 2. Fetch shard keys for project
 	shardKeys, err := s.shardKeysRepo.FetchShardKeysByProjectID(
 		ctx,
 		projectID,
@@ -65,15 +68,76 @@ func (s *RouterService) RouteSQL(
 		return nil, err
 	}
 
-	shardKeyColumn := ""
+	// Build table → shard key map
+	shardKeyMap := make(map[string]string)
 	for _, k := range shardKeys {
-		if k.TableName == tableName {
-			shardKeyColumn = k.ShardKeyColumn
-			break
-		}
+		shardKeyMap[k.TableName] = k.ShardKeyColumn
 	}
 
-	if shardKeyColumn == "" {
+	// handle join queries
+	if isJoin {
+
+		leftKey, ok1 := shardKeyMap[joinInfo.LeftTable]
+		rightKey, ok2 := shardKeyMap[joinInfo.RightTable]
+
+		// fmt.Println("left key: ", leftKey, "Right key:", rightKey)
+
+		if !ok1 || !ok2 {
+			return &RoutingPlan{
+				Mode:   RoutingModeRejected,
+				Reason: "shard key missing for join tables",
+				RejectError: &RoutingError{
+					Code:    ErrNoShardKey,
+					Message: "missing shard key for join tables",
+				},
+			}, nil
+		}
+
+		// Check colocated join condition
+		if joinInfo.LeftColumn == leftKey && joinInfo.RightColumn == rightKey {
+
+			// Fetch shards
+			shards, err := s.shardRepo.ShardList(ctx, projectID)
+			if err != nil {
+				return nil, err
+			}
+
+			targets := make([]ShardTarget, 0)
+
+			for _, sh := range shards {
+				if sh.Status == "active" {
+					targets = append(targets, ShardTarget{
+						ShardID: ShardID(sh.ID),
+					})
+				}
+			}
+
+			return &RoutingPlan{
+				Mode:    RoutingModeBroadcast,
+				Targets: targets,
+				Reason:  "colocated join detected",
+			}, nil
+		}
+
+		// Non-colocated joins not supported yet
+		return &RoutingPlan{
+			Mode:   RoutingModeRejected,
+			Reason: "non-colocated joins not supported",
+			RejectError: &RoutingError{
+				Code:    ErrUnsupportedPredicate,
+				Message: "non colocated joins not supported",
+			},
+		}, nil
+	}
+
+	// non join query flow
+	tableName, _, err := extractTableAndNode(rawStmt)
+	if err != nil {
+		return nil, err
+	}
+
+	shardKeyColumn, ok := shardKeyMap[tableName]
+	if !ok {
 		return &RoutingPlan{
 			Mode: RoutingModeRejected,
 			Reason: fmt.Sprintf(
@@ -87,7 +151,7 @@ func (s *RouterService) RouteSQL(
 		}, nil
 	}
 
-	// 4. Fetch shards
+	// Fetch shards
 	shards, err := s.shardRepo.ShardList(ctx, projectID)
 	if err != nil {
 		return nil, err
@@ -104,18 +168,15 @@ func (s *RouterService) RouteSQL(
 		return nil, fmt.Errorf("no active shards for project")
 	}
 
-	// 5. Sort shards by shard_index (deterministic order)
 	sort.Slice(activeShards, func(i, j int) bool {
 		return activeShards[i].ShardIndex < activeShards[j].ShardIndex
 	})
 
-	// 6. Build shard ID list (UUIDs)
 	shardIDs := make([]ShardID, 0, len(activeShards))
 	for _, sh := range activeShards {
 		shardIDs = append(shardIDs, ShardID(sh.ID))
 	}
 
-	// 7. Build ring + planner
 	ring := NewRing(shardIDs)
 	hasher := NewHasher()
 
@@ -125,7 +186,6 @@ func (s *RouterService) RouteSQL(
 		ring,
 	)
 
-	// 8. Build routing plan
 	plan := planner.Plan(
 		*node,
 		tableName,
@@ -134,7 +194,6 @@ func (s *RouterService) RouteSQL(
 
 	return plan, nil
 }
-
 func extractTableAndNode(
 	stmt *pg_query.RawStmt,
 ) (string, *pg_query.Node, error) {

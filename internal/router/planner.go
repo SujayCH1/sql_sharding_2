@@ -60,7 +60,7 @@ func (p *Planner) Plan(
 		}
 	}
 
-	// scatter gather optimization
+	// scatter gather optimizer ->  no. of keys >= no. of shards -> do bradcast instead of targeted routing
 	if len(pred.Values) >= p.ring.Size() && len(shards) > 1 {
 
 		targets := make([]ShardTarget, 0, p.ring.Size())

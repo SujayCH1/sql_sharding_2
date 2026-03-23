@@ -1,6 +1,8 @@
 package router
 
-import pg_query "github.com/pganalyze/pg_query_go/v5"
+import (
+	pg_query "github.com/pganalyze/pg_query_go/v5"
+)
 
 func ExtractShardPredicate(node pg_query.Node, table string, shardKey string) (*ExtractedPredicate, *RoutingError) {
 
@@ -212,12 +214,23 @@ func extractFromComparison(expr *pg_query.A_Expr, shardKey string) ([]any, *Rout
 
 func extractColumn(node *pg_query.Node) (string, bool) {
 	col, ok := node.Node.(*pg_query.Node_ColumnRef)
-	if !ok || len(col.ColumnRef.Fields) != 1 {
+	if !ok {
 		return "", false
 	}
 
-	field := col.ColumnRef.Fields[0].Node.(*pg_query.Node_String_)
-	return field.String_.Sval, true
+	fields := col.ColumnRef.Fields
+	if len(fields) == 0 {
+		return "", false
+	}
+
+	last := fields[len(fields)-1]
+
+	str, ok := last.Node.(*pg_query.Node_String_)
+	if !ok {
+		return "", false
+	}
+
+	return str.String_.Sval, true
 }
 
 func extractConst(node *pg_query.Node) (any, bool) {

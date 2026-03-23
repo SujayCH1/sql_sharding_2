@@ -9,7 +9,7 @@ type RouterConfig struct {
 
 func DefaultRouterConfig() RouterConfig {
 	return RouterConfig{
-		AllowBroadcast:    false,
+		AllowBroadcast:    true,
 		AllowRangeQueries: false,
 		MaxShardFanout:    4,
 		MaxRangeShardSpan: 4,
