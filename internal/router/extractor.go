@@ -1,6 +1,8 @@
 package router
 
-import pg_query "github.com/pganalyze/pg_query_go/v5"
+import (
+	pg_query "github.com/pganalyze/pg_query_go/v5"
+)
 
 func ExtractShardPredicate(node pg_query.Node, table string, shardKey string) (*ExtractedPredicate, *RoutingError) {
 
@@ -28,7 +30,6 @@ func ExtractShardPredicate(node pg_query.Node, table string, shardKey string) (*
 
 func extractFromInsert(stmt *pg_query.InsertStmt, table string, shardKey string) (*ExtractedPredicate, *RoutingError) {
 
-	// INSERT ... SELECT is not supported in v1
 	if stmt.SelectStmt == nil {
 		return nil, &RoutingError{
 			Code:    ErrUnsupportedPredicate,
@@ -39,7 +40,6 @@ func extractFromInsert(stmt *pg_query.InsertStmt, table string, shardKey string)
 	selectNode := stmt.SelectStmt.Node.(*pg_query.Node_SelectStmt)
 	selectStmt := selectNode.SelectStmt
 
-	// Only support INSERT ... VALUES
 	if selectStmt.ValuesLists == nil {
 		return nil, &RoutingError{
 			Code:    ErrUnsupportedPredicate,
@@ -47,7 +47,6 @@ func extractFromInsert(stmt *pg_query.InsertStmt, table string, shardKey string)
 		}
 	}
 
-	// Find shard key column index
 	colIndex := findShardKeyIndex(stmt.Cols, shardKey)
 	if colIndex < 0 {
 		return nil, &RoutingError{
@@ -150,6 +149,39 @@ func walkWhere(node *pg_query.Node, shardKey string) ([]any, *RoutingError) {
 
 func extractFromComparison(expr *pg_query.A_Expr, shardKey string) ([]any, *RoutingError) {
 
+	if expr.Kind == pg_query.A_Expr_Kind_AEXPR_IN {
+
+		col, ok := extractColumn(expr.Lexpr)
+		if !ok || col != shardKey {
+			return nil, nil
+		}
+
+		listNode, ok := expr.Rexpr.Node.(*pg_query.Node_List)
+		if !ok {
+			return nil, &RoutingError{
+				Code:    ErrUnsupportedPredicate,
+				Message: "invalid IN predicate",
+			}
+		}
+
+		values := make([]any, 0, len(listNode.List.Items))
+
+		for _, item := range listNode.List.Items {
+
+			val, ok := extractConst(item)
+			if !ok {
+				return nil, &RoutingError{
+					Code:    ErrUnsupportedPredicate,
+					Message: "non-constant value in IN predicate",
+				}
+			}
+
+			values = append(values, val)
+		}
+
+		return values, nil
+	}
+
 	if expr.Kind != pg_query.A_Expr_Kind_AEXPR_OP {
 		return nil, nil
 	}
@@ -182,12 +214,23 @@ func extractFromComparison(expr *pg_query.A_Expr, shardKey string) ([]any, *Rout
 
 func extractColumn(node *pg_query.Node) (string, bool) {
 	col, ok := node.Node.(*pg_query.Node_ColumnRef)
-	if !ok || len(col.ColumnRef.Fields) != 1 {
+	if !ok {
 		return "", false
 	}
 
-	field := col.ColumnRef.Fields[0].Node.(*pg_query.Node_String_)
-	return field.String_.Sval, true
+	fields := col.ColumnRef.Fields
+	if len(fields) == 0 {
+		return "", false
+	}
+
+	last := fields[len(fields)-1]
+
+	str, ok := last.Node.(*pg_query.Node_String_)
+	if !ok {
+		return "", false
+	}
+
+	return str.String_.Sval, true
 }
 
 func extractConst(node *pg_query.Node) (any, bool) {
