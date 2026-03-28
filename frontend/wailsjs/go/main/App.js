@@ -145,3 +145,7 @@ export function UpdateConnection(arg1) {
 export function UpdateProjectSchemaDraft(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateProjectSchemaDraft'](arg1, arg2, arg3);
 }
+
+export function UpsertAIConfig(arg1) {
+  return window['go']['main']['App']['UpsertAIConfig'](arg1);
+}

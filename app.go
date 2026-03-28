@@ -38,6 +38,7 @@ type App struct {
 	ColumnsRepo               *repository.ColumnRepository
 	FKEdgesRepo               *repository.FKEdgesRepository
 	ShardKeysRepo             *repository.ShardKeysRepository
+	AiConfigRepo              *repository.AIConfigRepository
 
 	// conn layer
 	ShardConnectionStore   *connections.ConnectionStore
@@ -83,6 +84,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ColumnsRepo = repository.NewColumnsRepository(db)
 	a.FKEdgesRepo = repository.NewFKEdgesRepository(db)
 	a.ShardKeysRepo = repository.NewShardKeysRepository(db)
+	a.AiConfigRepo = repository.NewAIConfigRepository(db)
 
 	// stores
 	a.ShardConnectionStore = connections.NewConnectionStore()
@@ -104,6 +106,7 @@ func (a *App) startup(ctx context.Context) {
 		a.ColumnsRepo,
 		a.FKEdgesRepo,
 		a.ShardKeysRepo,
+		a.AiConfigRepo,
 	)
 	a.RouterService = router.NewRouterService(
 		a.ShardKeysRepo,
@@ -1201,4 +1204,9 @@ func (a *App) execDDLonShard(projectID string, shardID string, ddl string) error
 
 	_, err = db.ExecContext(a.ctx, ddl)
 	return err
+}
+
+// ai config repository - upsert
+func (a *App) UpsertAIConfig(config repository.AIConfig) error {
+	return a.AiConfigRepo.UpsertConfig(a.ctx, config)
 }

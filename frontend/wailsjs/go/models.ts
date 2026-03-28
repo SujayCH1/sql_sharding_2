@@ -52,6 +52,24 @@ export namespace main {
 
 export namespace repository {
 	
+	export class AIConfig {
+	    ProjectID: string;
+	    Provider: string;
+	    APIKey: string;
+	    Model: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AIConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ProjectID = source["ProjectID"];
+	        this.Provider = source["Provider"];
+	        this.APIKey = source["APIKey"];
+	        this.Model = source["Model"];
+	    }
+	}
 	export class Project {
 	    id: string;
 	    name: string;

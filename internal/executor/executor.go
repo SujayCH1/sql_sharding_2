@@ -4,6 +4,7 @@ import (
 	"context"
 	"sql-sharding-v2/internal/connections"
 	"sql-sharding-v2/internal/router"
+	"sql-sharding-v2/pkg/logger"
 )
 
 // Executor is responsible for executing routed SQL on shards.
@@ -25,6 +26,8 @@ func (e *Executor) Execute(
 	sqlText string,
 	plan *router.RoutingPlan,
 ) ([]ExecutionResult, error) {
+
+	logger.Logger.Info("Executing query", "plan", plan)
 
 	// Router already validated this
 	if plan.Mode == router.RoutingModeRejected {

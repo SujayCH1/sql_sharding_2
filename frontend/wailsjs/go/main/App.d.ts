@@ -76,3 +76,5 @@ export function RetryShardConnections(arg1:context.Context):Promise<void>;
 export function UpdateConnection(arg1:repository.ShardConnection):Promise<void>;
 
 export function UpdateProjectSchemaDraft(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function UpsertAIConfig(arg1:repository.AIConfig):Promise<void>;

@@ -2,9 +2,9 @@ package shardkey
 
 import (
 	"context"
+	"fmt"
 
 	"sql-sharding-v2/internal/repository"
-	"sql-sharding-v2/internal/schema"
 	"sql-sharding-v2/pkg/logger"
 )
 
@@ -12,17 +12,20 @@ type InferenceService struct {
 	columnRepo   *repository.ColumnRepository
 	fkRepo       *repository.FKEdgesRepository
 	shardKeyRepo *repository.ShardKeysRepository
+	aiConfigRepo *repository.AIConfigRepository
 }
 
 func NewInferenceService(
 	columnRepo *repository.ColumnRepository,
 	fkRepo *repository.FKEdgesRepository,
 	shardKeyRepo *repository.ShardKeysRepository,
+	aiConfigRepo *repository.AIConfigRepository,
 ) *InferenceService {
 	return &InferenceService{
 		columnRepo:   columnRepo,
 		fkRepo:       fkRepo,
 		shardKeyRepo: shardKeyRepo,
+		aiConfigRepo: aiConfigRepo,
 	}
 }
 
@@ -31,31 +34,46 @@ func (s *InferenceService) ApplyShardKeyInference(
 	projectID string,
 ) error {
 
-	logger.Logger.Info("inference entry reached")
-
-	columns, err := s.columnRepo.GetColumnsByProjectID(ctx, projectID)
+	config, err := s.aiConfigRepo.GetConfigByProjectID(ctx, projectID)
 	if err != nil {
 		return err
 	}
 
-	fkEdges, err := s.fkRepo.GetEdgesByProjectID(ctx, projectID)
-	if err != nil {
-		return err
+	// No config at all → fallback
+	if config == nil {
+		logger.Logger.Info("No AI config found → using heuristic inference")
+		return s.RunHeuristicInference(ctx, projectID)
 	}
 
-	logicalSchema, err := schema.BuildLogicalSchemaFromMetadata(
-		projectID,
-		columns,
-		fkEdges,
-	)
-	if err != nil {
-		return err
+	fmt.Println("AI Config:", config)
+
+	// Ollama (no API key needed)
+	if config.Provider == "ollama" {
+		logger.Logger.Info("Using Ollama for inference")
+
+		err := s.RunLLMInference(ctx, projectID, config)
+		if err != nil {
+			logger.Logger.Warn("Ollama failed → fallback to heuristic", "error", err)
+			return s.RunHeuristicInference(ctx, projectID)
+		}
+
+		return nil
 	}
 
-	inferenceResult := BuildShardKeyPlan(logicalSchema)
-	inferred := convertDecisionsToShardKeyRecords(inferenceResult.Decisions)
+	// Other providers (require API key)
+	if config.APIKey == "" {
+		logger.Logger.Info("No API key → fallback to heuristic")
+		return s.RunHeuristicInference(ctx, projectID)
+	}
 
-	return s.shardKeyRepo.ReplaceShardKeysForProject(ctx, projectID, inferred)
+	// Ping external LLM
+	if err := PingLLM(ctx, config.APIKey, config.Model); err != nil {
+		logger.Logger.Warn("LLM unavailable → fallback to heuristic", "error", err)
+		return s.RunHeuristicInference(ctx, projectID)
+	}
+
+	// LLM inference
+	return s.RunLLMInference(ctx, projectID, config)
 }
 
 func convertDecisionsToShardKeyRecords(

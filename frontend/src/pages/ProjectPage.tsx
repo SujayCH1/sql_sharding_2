@@ -37,18 +37,22 @@ function SideNav({ projectId }: { projectId: string }) {
 
   return (
     <nav className="flex flex-col gap-1 w-40 shrink-0">
-      <NavLink end to={base} className={linkClass}>
-        Overview
-      </NavLink>
+  <NavLink end to={base} className={linkClass}>
+    Overview
+  </NavLink>
 
-      <NavLink to={`${base}/shards`} className={linkClass}>
-        Shards
-      </NavLink>
+  <NavLink to={`${base}/shards`} className={linkClass}>
+    Shards
+  </NavLink>
 
-      <NavLink to={`${base}/schema`} className={linkClass}>
-        Schema
-      </NavLink>
-    </nav>
+  <NavLink to={`${base}/schema`} className={linkClass}>
+    Schema
+  </NavLink>
+
+  <NavLink to={`${base}/ai-config`} className={linkClass}>
+    AI Config
+  </NavLink>
+</nav>
   )
 }
 

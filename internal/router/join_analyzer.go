@@ -31,7 +31,7 @@ func ExtractJoinInfo(stmt *pg_query.SelectStmt) (*JoinInfo, bool) {
 
 	expr := join.Quals.Node.(*pg_query.Node_AExpr).AExpr
 
-	fmt.Printf("Expression: %s", expr)
+	// fmt.Printf("Expression: %s", expr)
 
 	leftCol, ok1 := extractColumn(expr.Lexpr)
 	rightCol, ok2 := extractColumn(expr.Rexpr)

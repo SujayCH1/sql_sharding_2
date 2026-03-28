@@ -7,6 +7,7 @@ import OverviewPage from "./pages/project/OverviewPage"
 import ShardsPage from "./pages/project/ShardsPage"
 import ShardInfoPage from "./pages/project/shards/ShardInfoPage"
 import SchemaPage from "./pages/project/SchemaPage"
+import AiConfigPage from "./pages/project/AIConfigPage"
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route index element={<OverviewPage />} />
           <Route path="shards" element={<ShardsPage />} />
           <Route path="schema" element={<SchemaPage />} />
+          <Route path="ai-config" element={<AiConfigPage />} />
           <Route
             path="/projects/:projectId/shards/:shardId"
             element={<ShardInfoPage />}
